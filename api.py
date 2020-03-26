@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, session, abort, Response
 from flask_swagger import swagger
+import configparser
 
 import db
 
@@ -128,7 +129,7 @@ def sensor_measure(sensorid, option):
     # verify if the sensor supports a "measure" from database getTypeFromSensor()
     if option == "instant" :
         return Response(query_last(sensorid), status=200, mimetype='application/json')
-    else if option == "interval" :
+    elif option == "interval":
         extremo_min = request.args.get('start')
         extremo_max = request.args.get('end')
         return Response(query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
@@ -153,10 +154,25 @@ def sensor_event(sensorid, option):
 if __name__ == "__main__":
     try:
         app.run(host='', port=80)
-        db.init_dbs
+        config = configparser.ConfigParser()
+        config.read('options.conf')
+    
+        iurl = config['influxdb']['URL']
+        iport = config['influxdb']['PORT']
+        idb = config['influxdb']['DB']
+        iuser = config['influxdb']['USER']
+        ipw = config['influxdb']['PW']
+
+        pgurl = config['postgresql']['URL']
+        pgport = config['postgresql']['PORT']
+        pgdb = config['postgresql']['DB']
+        pguser = pgurl = config['postgresql']['USER']
+        pgpw = pgurl = config['postgresql']['PW']
+        
+        db.init_dbs(pgurl, pgport, pgdb, pguser, pgpw, iurl, iuser, ipw, iport, idb)
     except KeyboardInterrupt:
         pass
     finally:
-        db.close()
+        db.close_dbs()
         print("Goodbye!")
         quit(0)
