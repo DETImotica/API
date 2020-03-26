@@ -23,7 +23,7 @@ RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
 
 # Root endpoint
 
-@app.route("/", methods=['GET','HEAD'])
+@app.route("/1", methods=['GET','HEAD'])
 def index():
     return "DETImotica API v1", 200
 
@@ -128,15 +128,15 @@ def sensor_description(sensorid):
 def sensor_measure(sensorid, option):
     # verify if the sensor supports a "measure" from database getTypeFromSensor()
     if option == "instant" :
-        return Response(query_last(sensorid), status=200, mimetype='application/json')
+        return Response(db.query_last(sensorid), status=200, mimetype='application/json')
     elif option == "interval":
         extremo_min = request.args.get('start')
         extremo_max = request.args.get('end')
-        return Response(query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
-    else:
+        return Response(db.query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+    elif option == "mean":
         extremo_min = request.args.get('start')
         extremo_max = request.args.get('end')
-        return Response(query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+        return Response(db.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
 
 @app.route('/1/sensor/<sensorid>/event/<option>', methods=['GET'])
 def sensor_event(sensorid, option):
@@ -145,15 +145,12 @@ def sensor_event(sensorid, option):
     return jsonify(RESP_501), 501
 
 
-
-
 ####################################################
 ####################################################
 
 #TODO: try to run HTTPS (view certificates)
 if __name__ == "__main__":
     try:
-        app.run(host='', port=80)
         config = configparser.ConfigParser()
         config.read('options.conf')
     
@@ -166,10 +163,11 @@ if __name__ == "__main__":
         pgurl = config['postgresql']['URL']
         pgport = config['postgresql']['PORT']
         pgdb = config['postgresql']['DB']
-        pguser = pgurl = config['postgresql']['USER']
-        pgpw = pgurl = config['postgresql']['PW']
+        pguser = config['postgresql']['USER']
+        pgpw = config['postgresql']['PW']
         
         db.init_dbs(pgurl, pgport, pgdb, pguser, pgpw, iurl, iuser, ipw, iport, idb)
+        app.run(host='', port=80)
     except KeyboardInterrupt:
         pass
     finally:
