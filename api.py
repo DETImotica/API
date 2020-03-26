@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, session, abort, Response
 from flask_swagger import swagger
 
+import db
+
 # Flask global vars
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -125,10 +127,15 @@ def sensor_description(sensorid):
 def sensor_measure(sensorid, option):
     # verify if the sensor supports a "measure" from database getTypeFromSensor()
     if option == "instant" :
-        return Response(query_metrics(sensorid, 0), status=200, mimetype='application/json')
-
-    return jsonify(RESP_501), 501
-
+        return Response(query_last(sensorid), status=200, mimetype='application/json')
+    else if option == "interval" :
+        extremo_min = request.args.get('start')
+        extremo_max = request.args.get('end')
+        return Response(query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+    else:
+        extremo_min = request.args.get('start')
+        extremo_max = request.args.get('end')
+        return Response(query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
 
 @app.route('/1/sensor/<sensorid>/event/<option>', methods=['GET'])
 def sensor_event(sensorid, option):
@@ -146,8 +153,10 @@ def sensor_event(sensorid, option):
 if __name__ == "__main__":
     try:
         app.run(host='', port=80)
+        db.init_dbs
     except KeyboardInterrupt:
         pass
     finally:
+        db.close()
         print("Goodbye!")
         quit(0)
