@@ -1,10 +1,12 @@
-from influxdb import InfluxDBClient
-from influxdb.exceptions import InfluxDBClientError
-import psycopg2.extras
 import psycopg2
+import psycopg2.extras
 import json
 import sys
 import os
+
+from influxdb import InfluxDBClient
+from influxdb.exceptions import InfluxDBClientError
+from pymongo import MongoClient
 
 # class InfluxClient:
 #     def __init__(self,host,dbname,user,pw):
@@ -77,9 +79,8 @@ def query_avg(id, int1, int2):
     if not int1 or not int2:
         return json.dumps({})
 
-    res = influx_conn.query(f"SELECT AVG(\"value\") AS \"value\" FROM value WHERE (time >= '{int1}' AND time <= '{int2}') AND \"device\" = '{id}'")
+    res = influx_conn.query(f"SELECT MEAN(\"value\") AS \"value\" FROM value WHERE (time >= '{int1}' AND time <= '{int2}') AND \"device\" = '{id}'")
     
-    result = []
     for p in res.get_points():
         return json.dumps(dict({'values': [{"time": p['time'], "value": p['value']}]}))
     return json.dumps({})

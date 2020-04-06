@@ -1,8 +1,20 @@
-from flask import Flask, request, jsonify, session, abort, Response
-from flask_swagger import swagger
+"""
+Flask REST API module. 'Swagger UI'-based documentation compatible. 
+authors: Goncalo Perna, Eurico Dias
+"""
+
 import configparser
+import sys
+
+from flask import Flask, request, jsonify, Response
+from flask_swagger import swagger
 
 import db
+
+
+# API global vars
+VERSION = '1'
+TITLE = 'DETImotica API'
 
 # Flask global vars
 app = Flask(__name__)
@@ -12,18 +24,12 @@ app.config['JSON_SORT_KEYS'] = False
 OAUTH_VERSION = '1.0a'
 OAUTH_IDENTITY_CYPHER = 'HMAC-SHA1'
 
-# API global vars
-VERSION = '1.0'
-TITLE = 'DETImotica API'
-
 # Default responses
 RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
 
-# TODO: YAML docs
-
 # Root endpoint
 
-@app.route("/1", methods=['GET','HEAD'])
+@app.route("/1", methods=['GET', 'HEAD'])
 def index():
     return "DETImotica API v1", 200
 
@@ -41,11 +47,12 @@ def spec():
 ####################################################
 
 # Start login endpoint
-@app.route("/1/login")
+@app.route("/login")
 def login():
-    # TODO: hardcode values (DONT COMMIT JUST YET, TEST FIRST), then convert it to a more secure and scalable solution
-    # TODO: research for token and key storage
-    # TODO: secure check the token/cookie
+    # hardcode values (DONT COMMIT JUST YET, TEST FIRST), then convert it to a more secure and
+    # scalable solution
+    # research for token and key storage
+    # secure check the token/cookie
     # check login status: if cookie/token is 100% valid (untempered), authorize immediatly
     # get oauth parameter information
     # do the request, wait for auto-redirect
@@ -55,7 +62,7 @@ def login():
     return jsonify(RESP_501), 501
 
 # Login callback OAuth endpoint (should not be an endpoint maybe...?)
-@app.route("/1/auth_callback")
+@app.route("/auth_callback")
 def login_callback():
     # see confirm flag
     # check AT
@@ -63,10 +70,11 @@ def login_callback():
     return jsonify(RESP_501), 501
 
 # Logout endpoint
-@app.route("/1/logout")
+@app.route("/logout")
 def logout():
     # expire AT from user, revoking all access
-    # NOTE: front-end applications should redirect to login page and revoke all locally stored tokens/cookies, if applicable
+    # NOTE: front-end applications should redirect to login page and revoke all locally stored
+    # tokens/cookies, if applicable
     return jsonify(RESP_501), 501
 
 ##################################################
@@ -127,16 +135,17 @@ def sensor_description(sensorid):
 @app.route('/1/sensor/<sensorid>/measure/<option>', methods=['GET'])
 def sensor_measure(sensorid, option):
     # verify if the sensor supports a "measure" from database getTypeFromSensor()
-    if option == "instant" :
+    if option == "instant":
         return Response(db.query_last(sensorid), status=200, mimetype='application/json')
-    elif option == "interval":
+    if option == "interval":
         extremo_min = request.args.get('start')
         extremo_max = request.args.get('end')
         return Response(db.query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
-    elif option == "mean":
+    if option == "mean":
         extremo_min = request.args.get('start')
         extremo_max = request.args.get('end')
         return Response(db.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+    return Response(jsonify(RESP_501), status=401, mimetype='application/json')
 
 @app.route('/1/sensor/<sensorid>/event/<option>', methods=['GET'])
 def sensor_event(sensorid, option):
@@ -148,29 +157,31 @@ def sensor_event(sensorid, option):
 ####################################################
 ####################################################
 
-#TODO: try to run HTTPS (view certificates)
+# try to run HTTPS (view certificates)
 if __name__ == "__main__":
     try:
         config = configparser.ConfigParser()
         config.read('options.conf')
-    
-        iurl = config['influxdb']['URL']
-        iport = config['influxdb']['PORT']
-        idb = config['influxdb']['DB']
-        iuser = config['influxdb']['USER']
-        ipw = config['influxdb']['PW']
 
-        pgurl = config['postgresql']['URL']
-        pgport = config['postgresql']['PORT']
-        pgdb = config['postgresql']['DB']
-        pguser = config['postgresql']['USER']
-        pgpw = config['postgresql']['PW']
-        
-        db.init_dbs(pgurl, pgport, pgdb, pguser, pgpw, iurl, iuser, ipw, iport, idb)
+        IURL = config['influxdb']['URL']
+        IPORT = config['influxdb']['PORT']
+        IDB = config['influxdb']['DB']
+        IUSER = config['influxdb']['USER']
+        IPW = config['influxdb']['PW']
+
+        PGURL = config['postgresql']['URL']
+        PGPORT = config['postgresql']['PORT']
+        PGDB = config['postgresql']['DB']
+        PGUSER = config['postgresql']['USER']
+        PGPW = config['postgresql']['PW']
+
+        db.init_dbs(PGURL, PGPORT, PGDB, PGUSER, PGPW, IURL, IUSER, IPW, IPORT, IDB)
         app.run(host='', port=80)
     except KeyboardInterrupt:
         pass
+    except Exception as ex:
+        print("An error occurred initializing the app: \n" + str(ex))
     finally:
         db.close_dbs()
         print("Goodbye!")
-        quit(0)
+        sys.exit(0)
