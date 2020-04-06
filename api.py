@@ -176,7 +176,7 @@ if __name__ == "__main__":
         PGPW = config['postgresql']['PW']
 
         db.init_dbs(PGURL, PGPORT, PGDB, PGUSER, PGPW, IURL, IUSER, IPW, IPORT, IDB)
-        app.run(host='', port=80)
+        app.run(host='0.0.0.0', port=80)
     except KeyboardInterrupt:
         pass
     except Exception as ex:
