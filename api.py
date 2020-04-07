@@ -107,7 +107,7 @@ def auth_callback():
                         timestamp=str(int(time.time())),
                         )
 
-    return Response(requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, scope='uu'),status=200)
+    return Response(requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope': 'uu'}),status=200)
 
     # TODO: research about AT storage
     # create some sort of token with AT
