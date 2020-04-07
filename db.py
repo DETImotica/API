@@ -20,8 +20,10 @@ influx_conn = None
 
 # Initialize relational and read-only metrics database
 def init_dbs(pgurl, pgport, pgdb, pguser, pgpw, iurl, iuser, ipw, iport, idb):
+    
     # global pg_conn
     global influx_conn
+
     # pg_conn = psycopg2.connect(host = pgurl, port = pgport, user = pguser, dbname = pgdb)
     influx_conn = InfluxDBClient(host = iurl, port = iport, username = iuser, password = ipw, database = idb)
 

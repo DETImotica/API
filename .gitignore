@@ -1,3 +1,5 @@
+*.pem
 options.conf
+.appconfig
 __pycache__/
 .vscode/
