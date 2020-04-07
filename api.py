@@ -65,13 +65,13 @@ def login():
                     timestamp=str(int(time.time()))
                     )
     
-    req = requests.post("http://identity.ua.pt/oauth/request_token", auth=oauth_p1)
-    req_json = parse_qs(req.content.decode("utf-8"))
+    resp = requests.post("http://identity.ua.pt/oauth/request_token", auth=oauth_p1)
+    resp_json = parse_qs(resp.content.decode("utf-8"))
 
     global req_t, req_s
     
-    req_t = req_json['oauth_token'][0]
-    req_s = req_json['oauth_token_secret'][0]
+    req_t = resp_json['oauth_token'][0]
+    req_s = resp_json['oauth_token_secret'][0]
 
     return redirect (f"http://identity.ua.pt/oauth/authorize?oauth_token={req_t}&oauth_token_secret={req_s}", 307)
 
@@ -92,10 +92,11 @@ def auth_callback():
                         verifier=ov
                         )
 
-    req = requests.get("http://identity.ua.pt/oauth/access_token", auth=oauth_access)
-    
-    at = req['oauth_token']
-    ats = req['oauth_token_secret']
+    resp = requests.get("http://identity.ua.pt/oauth/access_token", auth=oauth_access)
+    resp_json = parse_qs(resp.content.decode("utf-8"))
+
+    at = resp_json['oauth_token'][0]
+    ats = resp_json['oauth_token_secret'][0]
 
     oauth_data = OAuth1(ck,
                         client_secret=cs,
@@ -106,14 +107,14 @@ def auth_callback():
                         timestamp=str(int(time.time())),
                         )
 
-    req = requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, scope='uu')
+    return Response(requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, scope='uu'),status=200)
 
     # TODO: research about AT storage
     # create some sort of token with AT
     # write a way to efficiently map user <-> token
     # send response with token to user
     
-    return Response(req.content.decode('utf-8'), status=200)
+    #return Response(req.content.decode('utf-8'), status=200)
 
     #return "Perfect, you are now logged in.", 200
 
