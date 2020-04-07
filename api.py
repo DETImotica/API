@@ -28,7 +28,7 @@ TITLE = 'DETImotica API'
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 
-# OAuth static global vars
+# OAuth global vars
 OAUTH_SIGNATURE = 'HMAC-SHA1'
 ck = None
 cs = None
@@ -68,10 +68,12 @@ def login():
     req = requests.post("http://identity.ua.pt/oauth/request_token", auth=oauth_p1)
     req_json = parse_qs(req.content.decode("utf-8"))
 
+    global req_t, req_s
+    
     req_t = req_json['oauth_token'][0]
     req_s = req_json['oauth_token_secret'][0]
 
-    return redirect (f"http://identity.ua.pt/oauth/authorize?oauth_token={req_t}", 307)
+    return redirect (f"http://identity.ua.pt/oauth/authorize?oauth_token={req_t}&oauth_token_secret={req_s}", 307)
 
 @app.route("/auth_callback")
 def auth_callback():
@@ -80,25 +82,40 @@ def auth_callback():
     ov = request.args.get('oauth_verifier')
     ot = request.args.get('oauth_token')
 
-    oauth_access = OAuth1(ck,
+    oauth_access =  OAuth1(ck,
                         client_secret=cs,
-                        resource_owner_key=ot,
-                        resource_owner_secret=ov,
+                        resource_owner_key=req_t,
+                        resource_owner_secret=req_s,
                         signature_method=OAUTH_SIGNATURE,
                         nonce=str(random.getrandbits(64)),
-                        timestamp=str(int(time.time()))
+                        timestamp=str(int(time.time())),
+                        verifier=ov
                         )
 
     req = requests.get("http://identity.ua.pt/oauth/access_token", auth=oauth_access)
     
-    print(req.content)
+    at = req['oauth_token']
+    ats = req['oauth_token_secret']
+
+    oauth_data = OAuth1(ck,
+                        client_secret=cs,
+                        resource_owner_key=at,
+                        resource_owner_secret=ats,
+                        signature_method=OAUTH_SIGNATURE,
+                        nonce=str(random.getrandbits(64)),
+                        timestamp=str(int(time.time())),
+                        )
+
+    req = requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, scope='uu')
 
     # TODO: research about AT storage
     # create some sort of token with AT
     # write a way to efficiently map user <-> token
     # send response with token to user
+    
+    return Response(req.content.decode('utf-8'), status=200)
 
-    return "Perfect, you are now logged in.", 200
+    #return "Perfect, you are now logged in.", 200
 
 @app.route("/logout")
 def logout():
