@@ -22,7 +22,7 @@ influx_conn = None
 def init_dbs(pgurl, pgport, pgdb, pguser, pgpw, iurl, iuser, ipw, iport, idb):
     
     # global pg_conn
-    global influx_conn
+    global influx_conn  
 
     # pg_conn = psycopg2.connect(host = pgurl, port = pgport, user = pguser, dbname = pgdb)
     influx_conn = InfluxDBClient(host = iurl, port = iport, username = iuser, password = ipw, database = idb)
@@ -36,7 +36,7 @@ def init_dbs(pgurl, pgport, pgdb, pguser, pgpw, iurl, iuser, ipw, iport, idb):
 
 # Close database connections
 def close_dbs():
-    global pg_conn
+    global pg_conn  
     global influx_conn
 
 #    pg_conn.close()
@@ -90,3 +90,9 @@ def query_avg(id, int1, int2):
 # Query users in the database
 def query_users():
     return None
+
+def add_user(id, email):
+    return True
+
+def has_user(id):
+    return False

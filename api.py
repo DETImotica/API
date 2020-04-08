@@ -10,13 +10,17 @@ from requests_oauthlib import OAuth1
 import requests
 from urllib.parse import parse_qs
 import configparser
-import oauthlib
 import random
+import re
 import sys
 import time
 
-from flask import Flask, request, jsonify, Response, redirect
+from flask import Flask, request, jsonify, Response, redirect, session, url_for, flash, abort
 from flask_swagger import swagger
+from flask_paranoid import Paranoid
+from flask_wtf.csrf import CSRFProtect
+
+from functools import wraps
 
 import db
 
@@ -27,6 +31,12 @@ TITLE = 'DETImotica API'
 # Flask global vars
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+
+csrf = CSRFProtect(app)
+paranoid = Paranoid(app)
+paranoid.redirect_view = '/'
 
 # OAuth global vars
 OAUTH_SIGNATURE = 'HMAC-SHA1'
@@ -36,9 +46,28 @@ cs = None
 # Default responses
 RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
 
+# Make sure user is logged in to access user data
+def auth_only(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('user') or not session.get('id') or not session.get('token'):
+            abort(401)
+        return f(*args, **kwargs)
+    return wrapper
+        
+@app.before_request
+def before_req_f():
+    if request.endpoint == "login":
+        if session.get('user'):
+            flash(f"You are already logged in as {session.get('user')}.")
+            abort(200)
+        
+
 @app.route("/1", methods=['GET', 'HEAD'])
+@auth_only
 def index():
-    '''Root endpoint'''
+    '''API Root endpoint'''
+
     return "DETImotica API v1", 200
 
 @app.route("/1/spec")
@@ -56,7 +85,11 @@ def spec():
 
 @app.route("/login")
 def login():
-    '''OAuth Authentication/Authorization endpoint.'''
+    """
+    OAuth Authentication/Authorization endpoint.
+    It consists of setting up an OAuth1.0a session up to the 'authorize' phase, redirecting to the identity's auth_url.
+    Final steps of OAuth1.0a are done on the auth_callback endpoint (and emulate authentication).
+    """
 
     oauth_p1 = OAuth1(ck, 
                     client_secret=cs,
@@ -100,31 +133,41 @@ def auth_callback():
 
     oauth_data = OAuth1(ck,
                         client_secret=cs,
-                        resource_owner_key=at,
+                        resource_owner_key=at,  
                         resource_owner_secret=ats,
                         signature_method=OAUTH_SIGNATURE,
                         nonce=str(random.getrandbits(64)),
                         timestamp=str(int(time.time())),
                         )
 
-    return Response(requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope': 'uu'}),status=200)
+    resp = requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : 'uu'})
 
-    # TODO: research about AT storage
-    # create some sort of token with AT
-    # write a way to efficiently map user <-> token
-    # send response with token to user
+    attrs = resp.content.decode('utf-8').split("@ua.pt")
+    uemail = attrs[0]
+    uuid = attrs[1]
+
+    session['id'] = uuid
+    session['user'] = uemail
+    session['token'] = at
+    session['secret'] = ats
+
+    # add user if it doesn't exist. If it does, 
+    if (db.has_user(uuid)):
+        pass
+    else:
+        db.add_user(uuid, uemail)
     
-    #return Response(req.content.decode('utf-8'), status=200)
-
-    #return "Perfect, you are now logged in.", 200
+    return Response("LOGIN OK", status=200)
 
 @app.route("/logout")
 def logout():
     '''Logout endpoint'''
+
+    session.clear()
     # expire AT and cookie from user, revoking all access
     # NOTE: front-end applications should redirect to login page and delete all
     # tokens/cookies, if applicable
-    return jsonify(RESP_501), 501
+    return Response("Logout successful.",status=200)
 
 ##################################################
 ##################################################
@@ -147,7 +190,6 @@ def room_id(roomid):
 ##################################################
 #---------User data exposure endpoints-----------#
 ##################################################
-
 
 @app.route('/1/users', methods=['GET'])
 def users():
@@ -225,15 +267,22 @@ if __name__ == "__main__":
         PGPW = config['postgresql']['PW']
 
         config.read(".appconfig")
-        ck = config['info']['key']
-        cs = config['info']['sec']
+        ck = config['info']['consumer_key']
+        cs = config['info']['consumer_secret']
 
+        app.config['SECRET_KEY'] = config['info']['app_key']
         db.init_dbs(PGURL, PGPORT, PGDB, PGUSER, PGPW, IURL, IUSER, IPW, IPORT, IDB)
+
+        
+        csrf.init_app(app)
+        paranoid.init_app(app)
         app.run(host='0.0.0.0', port=443, ssl_context=('cert.pem', 'key.pem'))
+
     except KeyboardInterrupt:
         pass
     except Exception as ex:
-        print("An error occurred initializing the app: \n" + str(ex))
+        db.close_dbs()
+        sys.exit("[ABORT] " + str(ex))
     finally:
         db.close_dbs()
         print("Goodbye!")
