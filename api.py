@@ -14,6 +14,7 @@ import random
 import re
 import sys
 import time
+import json
 
 from flask import Flask, request, jsonify, Response, redirect, session, url_for, flash, abort
 from flask_swagger import swagger
@@ -23,6 +24,7 @@ from flask_wtf.csrf import CSRFProtect
 from functools import wraps
 
 import db
+import db_queries
 
 # API global vars
 VERSION = '1'
@@ -178,14 +180,25 @@ def logout():
 
 @app.route('/1/rooms', methods=['GET'])
 def rooms():
-    '''Get all rooms id from database --> getRooms(db).'''
-    return jsonify(RESP_501), 501
+    dic = {}
+    dic.update(ids = db_queries.getRooms())
+    return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 
 @app.route('/1/room/<roomid>', methods=['GET', 'POST', 'DELETE'])
 def room_id(roomid):
-    '''Get all the sensors_id that are in the room from database -->  getSensorsFromRoom(bd, roomid).'''
+    if request.method == 'GET':
+        return Response(json.dumps(db_queries.getRoom(roomid)), status=200, mimetype='application/json')
+
+    #TODO falta introduzir salas e remover salas
     return jsonify(RESP_501), 501
+
+
+@app.route('/1/room/<roomid>/sensors', methods=['GET'])
+def sensors_room_id(roomid):
+    dic = {}
+    dic.update(ids = db_queries.getSensorsFromRoom(roomid))
+    return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 ##################################################
 #---------User data exposure endpoints-----------#
@@ -219,7 +232,10 @@ def types():
 
 @app.route('/1/sensor/<sensorid>', methods=['GET', 'POST', 'DELETE'])
 def sensor_description(sensorid):
-    '''Get the meta-data about the sensor from the database --> getSensor(bd, sensorid)'''
+    if request.method == 'GET':
+        return Response(json.dumps(db_queries.getSensor(sensorid)), status=200, mimetype='application/json')
+
+    # TODO falta introduzir salas e remover salas
     return jsonify(RESP_501), 501
 
 
