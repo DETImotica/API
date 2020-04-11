@@ -26,12 +26,15 @@ from requests_oauthlib import OAuth1
 import db
 import db_queries
 
+from api_grafana import grafana
+
 # API global vars
 VERSION = '1'
 TITLE = 'DETImotica API'
 
 # Flask global vars
 app = Flask(__name__)
+app.register_blueprint(grafana)
 app.config['JSON_SORT_KEYS'] = False
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -181,7 +184,7 @@ def rooms():
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 
-@app.route('1/room', methods=['POST'])
+@app.route('/1/room', methods=['POST'])
 def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
