@@ -6,21 +6,20 @@ DETImotica API: Flask REST API module
 authors: Goncalo Perna, Eurico Dias
 """
 
-from requests_oauthlib import OAuth1
-import requests
-from urllib.parse import parse_qs
 import configparser
 import random
-import re
 import sys
 import time
 
-from flask import Flask, request, jsonify, Response, redirect, session, url_for, flash, abort
-from flask_swagger import swagger
-from flask_paranoid import Paranoid
-from flask_wtf.csrf import CSRFProtect
-
 from functools import wraps
+from urllib.parse import parse_qs
+import requests
+
+from flask import Flask, abort, flash, jsonify, redirect, Response, request, session
+from flask_paranoid import Paranoid
+from flask_swagger import swagger
+from flask_wtf.csrf import CSRFProtect
+from requests_oauthlib import OAuth1
 
 import db
 
@@ -36,7 +35,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 csrf = CSRFProtect(app)
 paranoid = Paranoid(app)
-paranoid.redirect_view = '/'
+paranoid.redirect_view = '/1'
 
 # OAuth global vars
 OAUTH_SIGNATURE = 'HMAC-SHA1'
@@ -54,14 +53,13 @@ def auth_only(f):
             abort(401)
         return f(*args, **kwargs)
     return wrapper
-        
+
 @app.before_request
 def before_req_f():
     if request.endpoint == "login":
         if session.get('user'):
             flash(f"You are already logged in as {session.get('user')}.")
-            abort(200)
-        
+            return redirect(request.referrer)
 
 @app.route("/1", methods=['GET', 'HEAD'])
 @auth_only
@@ -91,22 +89,22 @@ def login():
     Final steps of OAuth1.0a are done on the auth_callback endpoint (and emulate authentication).
     """
 
-    oauth_p1 = OAuth1(ck, 
-                    client_secret=cs,
-                    signature_method=OAUTH_SIGNATURE,
-                    nonce=str(random.getrandbits(64)),
-                    timestamp=str(int(time.time()))
-                    )
-    
+    oauth_p1 = OAuth1(ck,
+                      client_secret=cs,
+                      signature_method=OAUTH_SIGNATURE,
+                      nonce=str(random.getrandbits(64)),
+                      timestamp=str(int(time.time()))
+                     )
+
     resp = requests.post("http://identity.ua.pt/oauth/request_token", auth=oauth_p1)
     resp_json = parse_qs(resp.content.decode("utf-8"))
 
     global req_t, req_s
-    
+
     req_t = resp_json['oauth_token'][0]
     req_s = resp_json['oauth_token_secret'][0]
 
-    return redirect (f"http://identity.ua.pt/oauth/authorize?oauth_token={req_t}&oauth_token_secret={req_s}", 307)
+    return redirect(f"http://identity.ua.pt/oauth/authorize?oauth_token={req_t}&oauth_token_secret={req_s}", 307)
 
 @app.route("/auth_callback")
 def auth_callback():
@@ -116,14 +114,14 @@ def auth_callback():
     ot = request.args.get('oauth_token')
 
     oauth_access =  OAuth1(ck,
-                        client_secret=cs,
-                        resource_owner_key=req_t,
-                        resource_owner_secret=req_s,
-                        signature_method=OAUTH_SIGNATURE,
-                        nonce=str(random.getrandbits(64)),
-                        timestamp=str(int(time.time())),
-                        verifier=ov
-                        )
+                           client_secret=cs,
+                           resource_owner_key=req_t,
+                           resource_owner_secret=req_s,
+                           signature_method=OAUTH_SIGNATURE,
+                           nonce=str(random.getrandbits(64)),
+                           timestamp=str(int(time.time())),
+                           verifier=ov
+                          )
 
     resp = requests.get("http://identity.ua.pt/oauth/access_token", auth=oauth_access)
     resp_json = parse_qs(resp.content.decode("utf-8"))
@@ -164,9 +162,6 @@ def logout():
     '''Logout endpoint'''
 
     session.clear()
-    # expire AT and cookie from user, revoking all access
-    # NOTE: front-end applications should redirect to login page and delete all
-    # tokens/cookies, if applicable
     return Response("Logout successful.",status=200)
 
 ##################################################
