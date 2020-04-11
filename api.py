@@ -10,6 +10,8 @@ import configparser
 import random
 import sys
 import time
+import json
+import uuid
 
 from functools import wraps
 from urllib.parse import parse_qs
@@ -22,6 +24,7 @@ from flask_wtf.csrf import CSRFProtect
 from requests_oauthlib import OAuth1
 
 import db
+import db_queries
 
 # API global vars
 VERSION = '1'
@@ -173,14 +176,41 @@ def logout():
 
 @app.route('/1/rooms', methods=['GET'])
 def rooms():
-    '''Get all rooms id from database --> getRooms(db).'''
-    return jsonify(RESP_501), 501
+    dic = {}
+    dic.update(ids = db_queries.getRooms())
+    return Response(json.dumps(dic), status=200, mimetype='application/json')
+
+
+@app.route('1/room', methods=['POST'])
+def newroom():
+    id = uuid.uuid4()
+    details = request.json  # {name: "", description: "", sensors: ["","",...] }
+    db_queries.createRoom(id, {"name":details["name"], "description":details["description"]}, details["sensors"])
+    return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
+
+
 
 
 @app.route('/1/room/<roomid>', methods=['GET', 'POST', 'DELETE'])
 def room_id(roomid):
-    '''Get all the sensors_id that are in the room from database -->  getSensorsFromRoom(bd, roomid).'''
+    if request.method == 'GET':
+        return Response(json.dumps(db_queries.getRoom(roomid)), status=200, mimetype='application/json')
+
+    #TODO atualizar (name e description) e remover salas
     return jsonify(RESP_501), 501
+
+
+@app.route('/1/room/<roomid>/sensors', methods=['GET', 'POST'])
+def sensors_room_id(roomid):
+    if request.method == 'GET':
+        dic = {}
+        dic.update(ids = db_queries.getSensorsFromRoom(roomid))
+        return Response(json.dumps(dic), status=200, mimetype='application/json')
+
+    if request.method == 'POST':
+        details = request.json  # {"sensors": {"add" : [], "remove" : []}}
+        db_queries.updateSensorsFromRoom(roomid, details)
+        return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
 
 ##################################################
 #---------User data exposure endpoints-----------#
@@ -212,9 +242,27 @@ def types():
     return jsonify(RESP_501), 501
 
 
+@app.route('/1/sensor', methods=['POST'])
+def new_sensor():
+    #TODO Falta sincronizar com o influx
+    id = uuid.uuid4()
+    details = request.json
+    db_queries.createSensor(id, details)
+    return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
+
+
 @app.route('/1/sensor/<sensorid>', methods=['GET', 'POST', 'DELETE'])
 def sensor_description(sensorid):
-    '''Get the meta-data about the sensor from the database --> getSensor(bd, sensorid)'''
+    if request.method == 'GET':
+        return Response(json.dumps(db_queries.getSensor(sensorid)), status=200, mimetype='application/json')
+
+    #TODO falta permitir alterar o simbolo e a descrição do sensor
+    if request.method == 'POST':
+        details = request.json #{"room_id: ""}
+        db_queries.updateSensor(sensorid, details)
+        return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
+
+    #TODO falta remover sensores
     return jsonify(RESP_501), 501
 
 
