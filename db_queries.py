@@ -8,6 +8,9 @@ def getRooms():
     db_con.close()
     return result
 
+
+
+
 def getRoom(roomid):
     db_con = psycopg2.connect(host=hostname, user=username, password=password, dbname=database)
     cursor = db_con.cursor()
@@ -17,6 +20,16 @@ def getRoom(roomid):
     db_con.close()
     return result
 
+def createRoom(roomid, roomdata, sensors):
+    db_con = psycopg2.connect(host=hostname, user=username, password=password, dbname=database)
+    cursor = db_con.cursor()
+    cursor.execute("INSERT INTO Espaco VALUES (%s, %s, %s);", (roomid, roomdata["name"], roomdata["description"]))
+    for s in sensors:
+        cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (roomid, s))
+    db_con.close()
+
+
+
 def getSensorsFromRoom(roomid):
     db_con = psycopg2.connect(host=hostname, user=username, password=password, dbname=database)
     cursor = db_con.cursor()
@@ -24,6 +37,22 @@ def getSensorsFromRoom(roomid):
     result = cursor.fetchall()
     db_con.close()
     return result
+
+def updateSensorsFromRoom(roomid, changes):
+    db_con = psycopg2.connect(host=hostname, user=username, password=password, dbname=database)
+    cursor = db_con.cursor()
+    for s in changes["add"]:
+        cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (roomid, s))
+
+    for s in changes["remove"]:
+        cursor.execute("UPDATE Sensor SET ID_Espaco = Null WHERE ID = %s;", (roomid, s))
+
+    db_con.close()
+
+
+
+
+
 
 def getSensor(sensorid):
     db_con = psycopg2.connect(host=hostname, user=username, password=password, dbname=database)
@@ -36,3 +65,16 @@ def getSensor(sensorid):
               }
     db_con.close()
     return result
+
+def createSensor(sensorid, sensordata):
+    db_con = psycopg2.connect(host=hostname, user=username, password=password, dbname=database)
+    cursor = db_con.cursor()
+    cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, NULL);",(sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"]))
+    db_con.close()
+
+
+def updateSensor(sensorid, sensordata):
+    db_con = psycopg2.connect(host=hostname, user=username, password=password, dbname=database)
+    cursor = db_con.cursor()
+    cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (sensordata["room_id"], sensorid))
+    db_con.close()

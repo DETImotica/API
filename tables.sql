@@ -20,7 +20,7 @@ CREATE TABLE Sensor (
 	Descricao varchar(50),		--Marca, intervalo de medicao, erro de medicao
 	Nome_TipoSensor varchar(50) not null,
 	Simbolo varchar(3) not null,			--EX ºC
-	ID_Espaco varchar(50) not null,
+	ID_Espaco varchar(50),
 	PRIMARY KEY (ID),
 	FOREIGN KEY (ID_Espaco) REFERENCES Espaco(ID),
 	FOREIGN KEY (Nome_TipoSensor) REFERENCES TipoSensor(Nome)
