@@ -16,7 +16,7 @@ CREATE TABLE TipoSensor (
 );
 
 CREATE TABLE Sensor (
-	ID varchar(50) not null,
+	id UUID not null,
 	Descricao varchar(50),		--Marca, intervalo de medicao, erro de medicao
 	Nome_TipoSensor varchar(50) not null,
 	Simbolo varchar(3) not null,			--EX ºC
@@ -28,7 +28,9 @@ CREATE TABLE Sensor (
 
 
 CREATE TABLE Utilizador (
+	uuid UUID NOT NULL,
 	Email varchar(50) not null,
+	is_admin BOOLEAN default false,
 	Perfil varchar(50)            -- grupo a que pertence (vai depender
 								  -- de como fazemos as politicas)
 	PRIMARY KEY (Email)

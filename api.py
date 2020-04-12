@@ -29,7 +29,8 @@ import db_queries
 from api_grafana import grafana
 
 # API global vars
-VERSION = '1'
+APP_BASE_ENDPOINT = 'api'
+VERSION = 'v1'
 TITLE = 'DETImotica API'
 
 # Flask global vars
@@ -41,7 +42,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 csrf = CSRFProtect(app)
 paranoid = Paranoid(app)
-paranoid.redirect_view = '/1'
+paranoid.redirect_view = "/"
 
 # OAuth global vars
 OAUTH_SIGNATURE = 'HMAC-SHA1'
@@ -67,14 +68,14 @@ def before_req_f():
             flash(f"You are already logged in as {session.get('user')}.")
             return redirect(request.referrer)
 
-@app.route("/1", methods=['GET', 'HEAD'])
-@auth_only
+@app.route("/", methods=['GET', 'HEAD'])
+#@auth_only
 def index():
     '''API Root endpoint'''
 
-    return "DETImotica API v1", 200
+    return f"DETImotica API {VERSION}", 200
 
-@app.route("/1/spec")
+@app.route("/spec")
 def spec():
     '''Swagger UI wrapper endpoint'''
     swag_obj = swagger(app)
@@ -177,14 +178,14 @@ def logout():
 #---------Room data exposure endpoints-----------#
 ##################################################
 
-@app.route('/1/rooms', methods=['GET'])
+@app.route("/rooms", methods=['GET'])
 def rooms():
     dic = {}
     dic.update(ids = db_queries.getRooms())
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 
-@app.route('/1/room', methods=['POST'])
+@app.route("/room", methods=['POST'])
 def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
@@ -194,7 +195,7 @@ def newroom():
 
 
 
-@app.route('/1/room/<roomid>', methods=['GET', 'POST', 'DELETE'])
+@app.route("/room/<roomid>", methods=['GET', 'POST', 'DELETE'])
 def room_id(roomid):
     if request.method == 'GET':
         return Response(json.dumps(db_queries.getRoom(roomid)), status=200, mimetype='application/json')
@@ -203,7 +204,7 @@ def room_id(roomid):
     return jsonify(RESP_501), 501
 
 
-@app.route('/1/room/<roomid>/sensors', methods=['GET', 'POST'])
+@app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
 def sensors_room_id(roomid):
     if request.method == 'GET':
         dic = {}
@@ -219,12 +220,12 @@ def sensors_room_id(roomid):
 #---------User data exposure endpoints-----------#
 ##################################################
 
-@app.route('/1/users', methods=['GET'])
+@app.route("/users", methods=['GET'])
 def users():
     '''Get all users (pelo menos uma chave) from the database --> getUsers(bd).'''
     return jsonify(RESP_501), 501
 
-@app.route('/1/user/<internalid>', methods=['POST'])
+@app.route("/user/<internalid>", methods=['POST'])
 def user_policy(internalid):
     '''change access policy on the database from the JSON received.'''
     return jsonify(RESP_501), 501
@@ -233,19 +234,19 @@ def user_policy(internalid):
 #---------Sensor data exposure endpoints---------#
 ##################################################
 
-@app.route('/1/sensors', methods=['GET'])
+@app.route("/sensors", methods=['GET'])
 def sensors():
     '''Get the sensors_id for a user from the database --> getAllowedSensors(bd, user_email).'''
     return jsonify(RESP_501), 501
 
 
-@app.route('/1/types', methods=['GET'])
+@app.route("/types", methods=['GET'])
 def types():
     '''Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)'''
     return jsonify(RESP_501), 501
 
 
-@app.route('/1/sensor', methods=['POST'])
+@app.route("/sensor", methods=['POST'])
 def new_sensor():
     #TODO Falta sincronizar com o influx
     id = uuid.uuid4()
@@ -254,7 +255,7 @@ def new_sensor():
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
 
 
-@app.route('/1/sensor/<sensorid>', methods=['GET', 'POST', 'DELETE'])
+@app.route("/sensor/<sensorid>", methods=['GET', 'POST', 'DELETE'])
 def sensor_description(sensorid):
     if request.method == 'GET':
         return Response(json.dumps(db_queries.getSensor(sensorid)), status=200, mimetype='application/json')
@@ -269,7 +270,7 @@ def sensor_description(sensorid):
     return jsonify(RESP_501), 501
 
 
-@app.route('/1/sensor/<sensorid>/measure/<option>', methods=['GET'])
+@app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
 def sensor_measure(sensorid, option):
     '''Verify if the sensor supports a "measure" from database getTypeFromSensor()'''
     if option == "instant":
@@ -284,7 +285,7 @@ def sensor_measure(sensorid, option):
         return Response(db.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
     return Response(jsonify(RESP_501), status=501, mimetype='application/json')
 
-@app.route('/1/sensor/<sensorid>/event/<option>', methods=['GET'])
+@app.route("/sensor/<sensorid>/event/<option>", methods=['GET'])
 def sensor_event(sensorid, option):
     '''Verify if the sensor supports "Events" from database'''
     # get data from influx
@@ -317,9 +318,9 @@ if __name__ == "__main__":
         cs = config['info']['consumer_secret']
 
         app.config['SECRET_KEY'] = config['info']['app_key']
-        db.init_dbs(PGURL, PGPORT, PGDB, PGUSER, PGPW, IURL, IUSER, IPW, IPORT, IDB)
-
+        app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
         
+        db.init_dbs(PGURL, PGPORT, PGDB, PGUSER, PGPW, IURL, IUSER, IPW, IPORT, IDB)
         csrf.init_app(app)
         paranoid.init_app(app)
         app.run(host='0.0.0.0', port=443, ssl_context=('cert.pem', 'key.pem'))
@@ -327,7 +328,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     except Exception as ex:
-        db.close_dbs()
+        db.close_dbs()  
         sys.exit("[ABORT] " + str(ex))
     finally:
         db.close_dbs()

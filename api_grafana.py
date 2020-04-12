@@ -2,16 +2,15 @@
 Flask REST API endpoints for Grafana support
 """
 
-from flask import Blueprint
+from flask import Blueprint, jsonify, Response
+from flask_cors import CORS
 
-VERSION = 'v1'
+grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
+CORS(grafana)
 
-grafana = Blueprint('grafana', __name__, url_prefix=f"/{VERSION}/grafana")
-
-@grafana.route('/')
+@grafana.route('/', methods=['GET', 'POST', 'OPTIONS'])
 def graf_root():
-    return 'OK', 200
-
+    return "OK", 200
 
 @grafana.route('/search')
 def graf_search():
