@@ -1,5 +1,7 @@
 CREATE DATABASE detimoticadb;
 
+\c detimoticadb
+
 CREATE TABLE Espaco (
 	ID varchar(50) not null,
 	Nome varchar(50),  			--Piso Numero, null caso nao seja numa sala Ex. Secretaria
@@ -12,7 +14,7 @@ CREATE TABLE Espaco (
 CREATE TABLE TipoSensor (
 	Nome varchar(50) not null,			--EX Temperatura
 	Descricao varchar(50),		--Não sei bem que dados seriam aqui
-	PRIMARY KEY (Nome),
+	PRIMARY KEY (Nome)
 );
 
 CREATE TABLE Sensor (
@@ -30,8 +32,8 @@ CREATE TABLE Sensor (
 CREATE TABLE Utilizador (
 	uuid UUID NOT NULL,
 	Email varchar(50) not null,
-	is_admin BOOLEAN default false,
-	Perfil varchar(50)            -- grupo a que pertence (vai depender
+	admin BOOLEAN default false,
+	Perfil varchar(50),            -- grupo a que pertence (vai depender
 								  -- de como fazemos as politicas)
 	PRIMARY KEY (Email)
 );
