@@ -23,8 +23,8 @@ from flask_swagger import swagger
 from flask_wtf.csrf import CSRFProtect
 from requests_oauthlib import OAuth1
 
-import db
-import db_queries
+from datadb import DataDB
+from pgdb import PGDB
 
 from api_grafana import grafana
 
@@ -41,6 +41,8 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 csrf = CSRFProtect(app)
+csrf.exempt(grafana)
+
 paranoid = Paranoid(app)
 paranoid.redirect_view = "/"
 
@@ -48,6 +50,9 @@ paranoid.redirect_view = "/"
 OAUTH_SIGNATURE = 'HMAC-SHA1'
 ck = None
 cs = None
+
+pgdb = PGDB()
+influxdb = DataDB()
 
 # Default responses
 RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
@@ -157,10 +162,10 @@ def auth_callback():
     session['secret'] = ats
 
     # add user if it doesn't exist. If it does, 
-    if (db.has_user(uuid)):
+    if (influxdb.has_user(uuid)):
         pass
     else:
-        db.add_user(uuid, uemail)
+        influxdb.add_user(uuid, uemail)
     
     return Response("LOGIN OK", status=200)
 
@@ -171,8 +176,6 @@ def logout():
     session.clear()
     return Response("Logout successful.",status=200)
 
-##################################################
-##################################################
 
 ##################################################
 #---------Room data exposure endpoints-----------#
@@ -181,7 +184,7 @@ def logout():
 @app.route("/rooms", methods=['GET'])
 def rooms():
     dic = {}
-    dic.update(ids = db_queries.getRooms())
+    dic.update(ids = pgdb.getRooms())
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 
@@ -189,16 +192,14 @@ def rooms():
 def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
-    db_queries.createRoom(id, {"name":details["name"], "description":details["description"]}, details["sensors"])
+    pgdb.createRoom(id, {"name":details["name"], "description":details["description"]}, details["sensors"])
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
-
-
 
 
 @app.route("/room/<roomid>", methods=['GET', 'POST', 'DELETE'])
 def room_id(roomid):
     if request.method == 'GET':
-        return Response(json.dumps(db_queries.getRoom(roomid)), status=200, mimetype='application/json')
+        return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
 
     #TODO atualizar (name e description) e remover salas
     return jsonify(RESP_501), 501
@@ -208,13 +209,14 @@ def room_id(roomid):
 def sensors_room_id(roomid):
     if request.method == 'GET':
         dic = {}
-        dic.update(ids = db_queries.getSensorsFromRoom(roomid))
+        dic.update(ids = pgdb.getSensorsFromRoom(roomid))
         return Response(json.dumps(dic), status=200, mimetype='application/json')
 
     if request.method == 'POST':
         details = request.json  # {"sensors": {"add" : [], "remove" : []}}
-        db_queries.updateSensorsFromRoom(roomid, details)
+        pgdb.updateSensorsFromRoom(roomid, details)
         return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
+
 
 ##################################################
 #---------User data exposure endpoints-----------#
@@ -229,6 +231,7 @@ def users():
 def user_policy(internalid):
     '''change access policy on the database from the JSON received.'''
     return jsonify(RESP_501), 501
+
 
 ##################################################
 #---------Sensor data exposure endpoints---------#
@@ -251,19 +254,19 @@ def new_sensor():
     #TODO Falta sincronizar com o influx
     id = uuid.uuid4()
     details = request.json
-    db_queries.createSensor(id, details)
+    pgdb.createSensor(id, details)
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
 
 
 @app.route("/sensor/<sensorid>", methods=['GET', 'POST', 'DELETE'])
 def sensor_description(sensorid):
     if request.method == 'GET':
-        return Response(json.dumps(db_queries.getSensor(sensorid)), status=200, mimetype='application/json')
+        return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
 
     #TODO falta permitir alterar o simbolo e a descrição do sensor
     if request.method == 'POST':
         details = request.json #{"room_id: ""}
-        db_queries.updateSensor(sensorid, details)
+        pgdb.updateSensor(sensorid, details)
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
 
     #TODO falta remover sensores
@@ -274,15 +277,15 @@ def sensor_description(sensorid):
 def sensor_measure(sensorid, option):
     '''Verify if the sensor supports a "measure" from database getTypeFromSensor()'''
     if option == "instant":
-        return Response(db.query_last(sensorid), status=200, mimetype='application/json')
+        return Response(influxdb.query_last(sensorid), status=200, mimetype='application/json')
     if option == "interval":
         extremo_min = request.args.get('start')
         extremo_max = request.args.get('end')
-        return Response(db.query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+        return Response(influxdb.query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
     if option == "mean":
         extremo_min = request.args.get('start')
         extremo_max = request.args.get('end')
-        return Response(db.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+        return Response(influxdb.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
     return Response(jsonify(RESP_501), status=501, mimetype='application/json')
 
 @app.route("/sensor/<sensorid>/event/<option>", methods=['GET'])
@@ -299,19 +302,6 @@ def sensor_event(sensorid, option):
 if __name__ == "__main__":
     try:
         config = configparser.ConfigParser()
-        config.read('options.conf')
-
-        IURL = config['influxdb']['URL']
-        IPORT = config['influxdb']['PORT']
-        IDB = config['influxdb']['DB']
-        IUSER = config['influxdb']['USER']
-        IPW = config['influxdb']['PW']
-
-        PGURL = config['postgresql']['URL']
-        PGPORT = config['postgresql']['PORT']
-        PGDB = config['postgresql']['DB']
-        PGUSER = config['postgresql']['USER']
-        PGPW = config['postgresql']['PW']
 
         config.read(".appconfig")
         ck = config['info']['consumer_key']
@@ -320,7 +310,6 @@ if __name__ == "__main__":
         app.config['SECRET_KEY'] = config['info']['app_key']
         app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
         
-        db.init_dbs(PGURL, PGPORT, PGDB, PGUSER, PGPW, IURL, IUSER, IPW, IPORT, IDB)
         csrf.init_app(app)
         paranoid.init_app(app)
         app.run(host='0.0.0.0', port=443, ssl_context=('cert.pem', 'key.pem'))
@@ -328,9 +317,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     except Exception as ex:
-        db.close_dbs()  
         sys.exit("[ABORT] " + str(ex))
     finally:
-        db.close_dbs()
         print("Goodbye!")
         sys.exit(0)

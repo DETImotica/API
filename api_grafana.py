@@ -2,9 +2,6 @@
 Flask REST API endpoints for Grafana support
 """
 
-import db_queries
-import db
-import _strptime
 import uuid
 
 from calendar import timegm
@@ -12,8 +9,14 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request, Response
 from flask_cors import CORS
 
+from pgdb import PGDB
+from datadb import DataDB
+
 grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
 CORS(grafana)
+
+pgdb = PGDB()
+influxdb = DataDB()
 
 def convert_to_time_ms(timestamp):
     return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ').timetuple())
@@ -24,11 +27,11 @@ def graf_root():
 
 @grafana.route('/search', methods=['POST'])
 def graf_search():
-    rooms= db_queries.getRooms()
+    rooms= pgdb.getRooms()
     #rooms= [('12'),('23'),('34')]
     res= []
     for r in rooms:
-        sensors= db_queries.getSensorsFromRoom(r)
+        sensors= pgdb.getSensorsFromRoom(r)
         #sensors= [(uuid.uuid4()),(uuid.uuid4()),(uuid.uuid4())]
         for s in sensors:
             res.append('Room'+r+'_'+str(s))
@@ -47,7 +50,7 @@ def graf_query():
     time_end= convert_to_time_ms(req['range']['to'])
     res= []
     for t in targets:
-        query= db.query_interval(uuid.UUID(t),time_st,time_end)
+        query= influxdb.query_interval(uuid.UUID(t),time_st,time_end)
         if not query=={}:
             result= query['values']
             datapoints= []
