@@ -3,8 +3,9 @@ Flask REST API endpoints for Grafana support
 """
 
 import db_queries
+import uuid
 
-from flask import Blueprint, jsonify, Response
+from flask import Blueprint, jsonify, request, Response
 from flask_cors import CORS
 
 grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
@@ -17,19 +18,19 @@ def graf_root():
 @grafana.route('/search', methods=['POST'])
 def graf_search():
     rooms= db_queries.getRooms()
-    #rooms= [(1),(2),(3)]
+    #rooms= [('12'),('23'),('34')]
     res= []
     for r in rooms:
-        sensors= db_queries.getSensorsFromRoom(r[0])
-        #sensors= [(1),(2),(4)]
+        sensors= db_queries.getSensorsFromRoom(r)
+        #sensors= [(uuid.uuid4()),(uuid.uuid4()),(uuid.uuid4())]
         for s in sensors:
-            res.append("Room"+str(r)+"_Sensor"+str(s))
+            res.append("Room"+r+"_Sensor"+str(s))
     return jsonify(res)
 
-@grafana.route('/query')
+@grafana.route('/query', methods=['POST'])
 def graf_query():
-    return 'OK', 200
+    return jsonify([])
 
-@grafana.route('/annotations')
+@grafana.route('/annotations', methods=['POST'])
 def graf_annotations():
-    return 'OK', 200 
+    return jsonify([])    
