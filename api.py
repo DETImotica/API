@@ -276,6 +276,8 @@ def types():
 
 @app.route("/sensor", methods=['POST'])
 def new_sensor():
+    #TODO Veficar se a pessoa é um admin
+
     #TODO Falta sincronizar com o influx
     id = uuid.uuid4()
     details = request.json
@@ -288,9 +290,8 @@ def sensor_description(sensorid):
     if request.method == 'GET':
         return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
 
-    #TODO falta permitir alterar o simbolo e a descrição do sensor
     if request.method == 'POST':
-        details = request.json #{"room_id: ""}
+        details = request.json #{"description": "", "data" : { "type" : "", "unit_symbol" : ""}, room_id: ""}
         pgdb.updateSensor(sensorid, details)
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
 

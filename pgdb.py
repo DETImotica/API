@@ -99,7 +99,12 @@ class PGDB(object):
     def updateSensor(self, sensorid, sensordata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (sensordata["room_id"], sensorid))
+        if "description" in sensordata:
+            cursor.execute("UPDATE Sensor SET Descricao = %s WHERE ID = %s;", (sensordata["description"], sensorid))
+        if "data" in sensordata and "type" in sensordata["data"]:
+            cursor.execute("UPDATE Sensor SET Nome_TipoSensor = %s WHERE ID = %s;", (sensordata["data"]["type"], sensorid))
+        if "data" in sensordata and "unit_symbol" in sensordata["data"]:
+            cursor.execute("UPDATE Sensor SET Simbolo = %s WHERE ID = %s;", (sensordata["data"]["unit_symbol"], sensorid))
         db_con.close()
 
     def isSensorFree(self, sensorid):
