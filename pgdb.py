@@ -37,6 +37,17 @@ class PGDB(object):
         db_con.close()
         return result
 
+    def updateRoom(self,roomid, new_details):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        if "name" in new_details:
+            cursor.execute("UPDATE Espaco SET Nome = %s WHERE ID = %s;", (new_details["name"], roomid))
+        if "description" in new_details:
+            cursor.execute("UPDATE Espaco SET Descricao = %s WHERE ID = %s;", (new_details["description"], roomid))
+
+        db_con.close()
+
+
     def createRoom(self, roomid, roomdata, sensors):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()

@@ -218,9 +218,15 @@ def newroom():
 @app.route("/room/<roomid>", methods=['GET', 'POST', 'DELETE'])
 def room_id(roomid):
     if request.method == 'GET':
+        #TODO podemos depois aquilo restringir com as politicas as info das salas
         return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
 
-    #TODO atualizar (name e description) e remover salas
+    if request.method == 'POST':
+        new_details = request.json #{name: "", description: ""}
+        pgdb.updateRoom(roomid, new_details)
+        return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
+
+    #TODO remover salas
     return jsonify(RESP_501), 501
 
 
