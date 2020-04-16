@@ -189,9 +189,28 @@ def rooms():
 
 
 @app.route("/room", methods=['POST'])
+
+#Error cases
+# 1 - at least one of the sensors is already linked to a room
+# 2 - at least one of the sensors doesnt exist
+
+#In a valid case we send the id of the new room
+
 def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
+
+    error = {"non_existent": [], "non_free": []}
+    for s in details["sensors"]:
+        try:
+            if (not pgdb.isSensorFree(s)):
+                error["non_free"].append(s)
+        except:
+            error["non_existent"].append(s)
+
+    if(error["non_existent"] != [] or error["non_free"] != []):
+        return Response(json.dumps(error), status=400, mimetype='application/json')
+
     pgdb.createRoom(id, {"name":details["name"], "description":details["description"]}, details["sensors"])
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
 

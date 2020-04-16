@@ -90,3 +90,23 @@ class PGDB(object):
         cursor = db_con.cursor()
         cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (sensordata["room_id"], sensorid))
         db_con.close()
+
+    def isSensorFree(self, sensorid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id='%s';", (sensorid))
+        result = cursor.fetchone()
+
+        if result == None :
+            raise ValueError
+        if result == "Null":
+            return True
+        return False
+
+    def isAdmin(self, userid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT admin FROM Utilizador WHERE uuid = '%s';", (userid,))
+        res = cursor.fetchone()
+        db_con.close()
+        return bool(res[0])
