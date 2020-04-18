@@ -12,8 +12,6 @@ def app_not_found(env, resp):
 config = configparser.ConfigParser()
 
 config.read(".appconfig")
-ck = config['info']['consumer_key']
-cs = config['info']['consumer_secret']
 
 app.config['SECRET_KEY'] = config['info']['app_key']
 app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
@@ -23,9 +21,9 @@ paranoid.init_app(app)
 
 app.wsgi_app = DispatcherMiddleware(app_not_found, {f"/{APP_BASE_ENDPOINT}/{VERSION}": app.wsgi_app})
 
-gunicorn_logger = logging.getLogger('gunicorn.access')
-app.logger.handlers = gunicorn_logger.handlers
-app.logger.setLevel(gunicorn_logger.level)
+#gunicorn_logger = logging.getLogger('gunicorn.access')
+#app.logger.handlers = gunicorn_logger.handlers
+#app.logger.setLevel(gunicorn_logger.level)
 
 if __name__ == "__main__":
-    app.run(debug=True, port=443, ssl_context=('cert.pem', 'key.pem'))
+    app.run(debug=True, port=555, ssl_context=('cert.pem', 'key.pem'))
