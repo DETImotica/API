@@ -222,7 +222,7 @@ def room_id(roomid):
         if pgdb.roomExists(roomid):
             #TODO podemos depois aquilo restringir com as politicas as info das salas
             return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=200, mimetype='application/json')
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
 
 
 
@@ -251,7 +251,7 @@ def sensors_room_id(roomid):
             dic.update(ids = pgdb.getSensorsFromRoom(roomid))
             # TODO verificar quais sensores o user tem acesso
             return Response(json.dumps(dic), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=200, mimetype='application/json')
+        return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=400, mimetype='application/json')
 
     if request.method == 'POST':
         if pgdb.roomExists(roomid):
@@ -274,7 +274,7 @@ def sensors_room_id(roomid):
                     error["rm_sensors"]["non_existent"].append(s)
 
             if len(error["add_sensors"]["non_free"]) > 0 or len(error["add_sensors"]["non_existent"]) > 0 or len(error["rm_sensors"]["diferent_room"]) > 0 or len(error["rm_sensors"]["non_existent"]) > 0 :
-                return Response(json.dumps(error), status=200, mimetype='application/json')
+                return Response(json.dumps(error), status=400, mimetype='application/json')
 
             pgdb.updateSensorsFromRoom(roomid, details)
             return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
@@ -296,7 +296,7 @@ def user_policy(internalid):
 
 ##################################################
 #---------Sensor data exposure endpoints---------#
-################################################## #"Authorization": "Basic ZGV0aW1vdGljOnNRV3N4VzVkVFE4N0pQTGY=", "Host" : "iot.av.it.pt", "Accept": "*/*"
+##################################################
 
 @app.route("/sensors", methods=['GET'])
 def sensors():
@@ -310,12 +310,14 @@ def types():
     return jsonify(RESP_501), 501
 
 
-@app.route("/sensor", methods=['GET', 'POST'])
+@app.route("/sensor", methods=['POST'])
 @csrf.exempt
 def new_sensor():
     id = uuid.uuid4()
-    details = request.json
+    details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
     #TODO Veficar se a pessoa é um admin
+
+    #TODO Verificar se os campos estao todos, e ainda verifcar se cabem na base de dados
 
     #url = "http://iot.av.it.pt/device/standalone"
     #data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
@@ -323,6 +325,12 @@ def new_sensor():
     #if response.status_code == 409:
     #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
+    if not pgdb.datatypeExist(details["data"]["type"]):
+        return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+
+    if "room_id" in details:
+        if not pgdb.roomExists(details["room_id"]):
+            return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
 
     pgdb.createSensor(id, details)
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
@@ -331,10 +339,30 @@ def new_sensor():
 @app.route("/sensor/<sensorid>", methods=['GET', 'POST', 'DELETE'])
 def sensor_description(sensorid):
     if request.method == 'GET':
-        return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
+        # TODO verificar quais sensores o user tem acesso
+        try:
+            pgdb.isSensorFree(sensorid)
+            return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
+        except:
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
 
     if request.method == 'POST':
         details = request.json #{"description": "", "data" : { "type" : "", "unit_symbol" : ""}, room_id: ""}
+        # TODO verificar quais sensores o user tem acesso
+
+        try:
+            pgdb.isSensorFree(sensorid)
+        except:
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
+
+
+        if "data" in details and "type" in details["data"] and not pgdb.datatypeExist(details["data"]["type"]):
+            return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+
+        if "room_id" in details:
+            if not pgdb.roomExists(details["room_id"]):
+                return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+
         pgdb.updateSensor(sensorid, details)
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
 

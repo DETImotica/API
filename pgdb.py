@@ -93,7 +93,8 @@ class PGDB(object):
     def createSensor(self, sensorid, sensordata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, NULL);",(sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"]))
+        if "room_id" in sensordata:
+            cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
         db_con.close()
 
 
@@ -136,6 +137,16 @@ class PGDB(object):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         cursor.execute("SELECT Nome FROM Espaco WHERE ID = %s;", (roomid,))
+        if cursor.fetchone() == None:
+            db_con.close()
+            return False
+        db_con.close()
+        return True
+
+    def datatypeExists(self, name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Descricao FROM TipoSensor WHERE Nome = %s;", (name,))
         if cursor.fetchone() == None:
             db_con.close()
             return False
