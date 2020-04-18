@@ -38,7 +38,7 @@ class DataDB(object):
             influx_conn.close()
             return json.dumps(dict({'values': [{"time": p['time'], "value": p['value']}]}))
         influx_conn.close()
-        return json.dumps({})
+        return json.dumps({'values': []})
 
     # Get a set of metrics from a sensor
     def query_interval(self, id, int1, int2):
@@ -46,11 +46,11 @@ class DataDB(object):
             return json.dumps({})
 
         influx_conn = self._open()
-        
+
         res = influx_conn.query(f"SELECT \"value\" FROM value WHERE (time >= '{int1}' AND time <= '{int2}') AND \"device\" = '{id}'")
         if not res:
             influx_conn.close()
-            return json.dumps({})
+            return json.dumps({'values': []})
         
         result = []
         for p in res.get_points():

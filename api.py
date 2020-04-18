@@ -17,7 +17,7 @@ from functools import wraps
 from urllib.parse import parse_qs
 import requests
 
-from flask import Flask, abort, flash, jsonify, redirect, Response, request, session
+from flask import Flask, abort, flash, g, jsonify, redirect, Response, request, session
 from flask_paranoid import Paranoid
 from flask_swagger import swagger
 from flask_wtf.csrf import CSRFProtect
@@ -49,8 +49,11 @@ paranoid.redirect_view = "/"
 
 # OAuth global vars
 OAUTH_SIGNATURE = 'HMAC-SHA1'
-ck = None
-cs = None
+config = configparser.ConfigParser()
+
+config.read(".appconfig")
+ck = config['info']['consumer_key']
+cs = config['info']['consumer_secret']
 
 pgdb = PGDB()
 influxdb = DataDB()
@@ -109,15 +112,18 @@ def login():
                       timestamp=str(int(time.time()))
                      )
 
-    resp = requests.post("http://identity.ua.pt/oauth/request_token", auth=oauth_p1)
+    resp = requests.post("https://identity.ua.pt/oauth/request_token", auth=oauth_p1)
+    
+    if resp.status_code != 200:
+        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>", 
+                        status=resp.status_code
+                        )
+
     resp_json = parse_qs(resp.content.decode("utf-8"))
 
-    global req_t, req_s
+    session['_rt'] = (resp_json['oauth_token'][0], resp_json['oauth_token_secret'][0])
 
-    req_t = resp_json['oauth_token'][0]
-    req_s = resp_json['oauth_token_secret'][0]
-
-    return redirect(f"http://identity.ua.pt/oauth/authorize?oauth_token={req_t}&oauth_token_secret={req_s}", 307)
+    return redirect(f"https://identity.ua.pt/oauth/authorize?oauth_token={session['_rt'][0]}&oauth_token_secret={session['_rt'][0]}", 302)
 
 @app.route("/auth_callback")
 def auth_callback():
@@ -126,21 +132,32 @@ def auth_callback():
     ov = request.args.get('oauth_verifier')
     ot = request.args.get('oauth_token')
 
+    if request.args.get('consent'):
+        return Response("OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>", status=401)
+    
+    rt = session.pop('_rt')
     oauth_access =  OAuth1(ck,
                            client_secret=cs,
-                           resource_owner_key=req_t,
-                           resource_owner_secret=req_s,
+                           resource_owner_key=ot,
+                           resource_owner_secret=rt[1],
                            signature_method=OAUTH_SIGNATURE,
                            nonce=str(random.getrandbits(64)),
                            timestamp=str(int(time.time())),
                            verifier=ov
                           )
 
-    resp = requests.get("http://identity.ua.pt/oauth/access_token", auth=oauth_access)
+    resp = requests.get("https://identity.ua.pt/oauth/access_token", auth=oauth_access)
     resp_json = parse_qs(resp.content.decode("utf-8"))
 
-    at = resp_json['oauth_token'][0]
-    ats = resp_json['oauth_token_secret'][0]
+    if not resp_json:
+        return Response(f"Error.\nServer returned: <b>{resp.content.decode()}</b>", status=resp.status_code)
+    
+    try:
+        at = resp_json['oauth_token'][0]
+        ats = resp_json['oauth_token_secret'][0]
+    except KeyError:
+        return Response("""OAuth Error. Please contact an administrator.<br>
+                        Server returned: <b>OAuth Server error</b>""", status=500)
 
     oauth_data = OAuth1(ck,
                         client_secret=cs,
@@ -151,7 +168,7 @@ def auth_callback():
                         timestamp=str(int(time.time())),
                         )
 
-    resp = requests.get("http://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : 'uu'})
+    resp = requests.get("https://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : 'uu'})
 
     attrs = resp.content.decode('utf-8').split("@ua.pt")
     uemail = attrs[0]
@@ -398,11 +415,7 @@ def sensor_event(sensorid, option):
 # (or a real cert?) 
 if __name__ == "__main__":
     try:
-        config = configparser.ConfigParser()
-
         config.read(".appconfig")
-        ck = config['info']['consumer_key']
-        cs = config['info']['consumer_secret']
 
         app.config['SECRET_KEY'] = config['info']['app_key']
         app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
