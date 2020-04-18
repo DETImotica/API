@@ -40,6 +40,7 @@ class PGDB(object):
     def updateRoom(self,roomid, new_details):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
+
         if "name" in new_details:
             cursor.execute("UPDATE Espaco SET Nome = %s WHERE ID = %s;", (new_details["name"], roomid))
         if "description" in new_details:
@@ -110,7 +111,7 @@ class PGDB(object):
     def isSensorFree(self, sensorid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id='%s';", (sensorid))
+        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id='%s';", (sensorid,))
         result = cursor.fetchone()
 
         if result == None :
@@ -118,6 +119,16 @@ class PGDB(object):
         if result == "Null":
             return True
         return False
+
+    def roomExists(self, roomid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Nome FROM Espaco WHERE ID = %s;", (roomid,))
+        if cursor.fetchone() == None:
+            db_con.close()
+            return False
+        db_con.close()
+        return True
 
     def isAdmin(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)

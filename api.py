@@ -219,13 +219,24 @@ def newroom():
 @app.route("/room/<roomid>", methods=['GET', 'POST', 'DELETE'])
 def room_id(roomid):
     if request.method == 'GET':
-        #TODO podemos depois aquilo restringir com as politicas as info das salas
-        return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
+        if pgdb.roomExists(roomid):
+            #TODO podemos depois aquilo restringir com as politicas as info das salas
+            return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=200, mimetype='application/json')
+
+
+
 
     if request.method == 'POST':
         new_details = request.json #{name: "", description: ""}
-        pgdb.updateRoom(roomid, new_details)
-        return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
+        if (len(new_details["name"])>50 or len(new_details["description"]>50)):
+            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=200, mimetype='application/json')
+
+        if pgdb.roomExists(roomid):
+            # TODO podemos depois aquilo restringir com as politicas as info das salas
+            pgdb.updateRoom(roomid, new_details)
+            return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=200, mimetype='application/json')
 
     #TODO remover salas
     return jsonify(RESP_501), 501
