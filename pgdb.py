@@ -37,6 +37,17 @@ class PGDB(object):
         db_con.close()
         return result
 
+    def updateRoom(self,roomid, new_details):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        if "name" in new_details:
+            cursor.execute("UPDATE Espaco SET Nome = %s WHERE ID = %s;", (new_details["name"], roomid))
+        if "description" in new_details:
+            cursor.execute("UPDATE Espaco SET Descricao = %s WHERE ID = %s;", (new_details["description"], roomid))
+
+        db_con.close()
+
+
     def createRoom(self, roomid, roomdata, sensors):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -88,7 +99,12 @@ class PGDB(object):
     def updateSensor(self, sensorid, sensordata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (sensordata["room_id"], sensorid))
+        if "description" in sensordata:
+            cursor.execute("UPDATE Sensor SET Descricao = %s WHERE ID = %s;", (sensordata["description"], sensorid))
+        if "data" in sensordata and "type" in sensordata["data"]:
+            cursor.execute("UPDATE Sensor SET Nome_TipoSensor = %s WHERE ID = %s;", (sensordata["data"]["type"], sensorid))
+        if "data" in sensordata and "unit_symbol" in sensordata["data"]:
+            cursor.execute("UPDATE Sensor SET Simbolo = %s WHERE ID = %s;", (sensordata["data"]["unit_symbol"], sensorid))
         db_con.close()
 
     def isSensorFree(self, sensorid):

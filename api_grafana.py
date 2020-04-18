@@ -65,3 +65,4 @@ def graf_query():
 @grafana.route('/annotations', methods=['POST'])
 def graf_annotations():
     return jsonify([])    
+
