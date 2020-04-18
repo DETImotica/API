@@ -40,6 +40,7 @@ app.config['JSON_SORT_KEYS'] = False
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
+
 csrf = CSRFProtect(app)
 csrf.exempt(grafana)
 
@@ -260,7 +261,7 @@ def user_policy(internalid):
 
 ##################################################
 #---------Sensor data exposure endpoints---------#
-##################################################
+################################################## #"Authorization": "Basic ZGV0aW1vdGljOnNRV3N4VzVkVFE4N0pQTGY=", "Host" : "iot.av.it.pt", "Accept": "*/*"
 
 @app.route("/sensors", methods=['GET'])
 def sensors():
@@ -274,13 +275,20 @@ def types():
     return jsonify(RESP_501), 501
 
 
-@app.route("/sensor", methods=['POST'])
+@app.route("/sensor", methods=['GET', 'POST'])
+@csrf.exempt
 def new_sensor():
-    #TODO Veficar se a pessoa é um admin
-
-    #TODO Falta sincronizar com o influx
     id = uuid.uuid4()
     details = request.json
+    #TODO Veficar se a pessoa é um admin
+
+    #url = "http://iot.av.it.pt/device/standalone"
+    #data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
+    #response = requests.post(url, headers={"Content-Type": "application/json"}, auth=("detimotic", "<pass>"), data=json.dumps(data_influx))
+    #if response.status_code == 409:
+    #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
+
+
     pgdb.createSensor(id, details)
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
 
