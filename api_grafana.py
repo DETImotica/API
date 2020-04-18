@@ -25,6 +25,7 @@ def convert_to_time_ms(timestamp):
     except:
         return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').timetuple())
 
+
 @grafana.route('/', methods=['GET', 'POST', 'OPTIONS'])
 def graf_root():
     return "OK", 200
@@ -37,6 +38,7 @@ def graf_search():
     for r in rooms:
         sensors= pgdb.getSensorsFromRoom(r)
         #sensors= [uuid.UUID('55fbf7d0-cc47-4642-9290-a493d383ad8c'),uuid.UUID('e7cdb45b-e370-4d74-bb3a-8ebe7527e458')]
+
         for s in sensors:
             res.append('Room'+r+'_'+str(s))
     return jsonify(res)
