@@ -120,6 +120,18 @@ class PGDB(object):
             return True
         return False
 
+    def isSensorRoom(self, sensorid, roomid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id='%s';", (sensorid,))
+        result = cursor.fetchone()
+
+        if result == None :
+            raise ValueError
+        if result == roomid:
+            return True
+        return False
+
     def roomExists(self, roomid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()

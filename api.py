@@ -201,7 +201,7 @@ def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
-    error = {"non_existent": [], "non_free": []}
+    error = {"non_existent": [], "non_free": [], "error_description": "Some of the sensors does not exist or are not free"}
     for s in details["sensors"]:
         try:
             if (not pgdb.isSensorFree(s)):
@@ -245,15 +245,39 @@ def room_id(roomid):
 @app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
 def sensors_room_id(roomid):
     if request.method == 'GET':
-        dic = {}
-        dic.update(ids = pgdb.getSensorsFromRoom(roomid))
-        return Response(json.dumps(dic), status=200, mimetype='application/json')
+        if pgdb.roomExists(roomid):
+            # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
+            dic = {}
+            dic.update(ids = pgdb.getSensorsFromRoom(roomid))
+            # TODO verificar quais sensores o user tem acesso
+            return Response(json.dumps(dic), status=200, mimetype='application/json')
+        return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=200, mimetype='application/json')
 
     if request.method == 'POST':
-        details = request.json  # {"sensors": {"add" : [], "remove" : []}}
-        pgdb.updateSensorsFromRoom(roomid, details)
-        return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
+        if pgdb.roomExists(roomid):
+            # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
+            details = request.json  # {"sensors": {"add" : [], "remove" : []}}
+            error = {"add_sensors" : {"non_free": [], "non_existent": []}, "rm_sensors": {"diferent_room" : [], "non_existent" : []}, "error_description" : "One of the sensors sent is invalid"}
 
+            for s in details["sensors"]["add"]:
+                try:
+                    if (not pgdb.isSensorFree(s)):
+                        error["add_sensors"]["non_free"].append(s)
+                except:
+                    error["add_sensors"]["non_existent"].append(s)
+
+            for s in details["sensores"]["remove"]:
+                try:
+                    if (not pgdb.isSensorRoom(s, roomid)):
+                        error["rm_sensors"]["diferent_room"].append(s)
+                except:
+                    error["rm_sensors"]["non_existent"].append(s)
+
+            if len(error["add_sensors"]["non_free"]) > 0 or len(error["add_sensors"]["non_existent"]) > 0 or len(error["rm_sensors"]["diferent_room"]) > 0 or len(error["rm_sensors"]["non_existent"]) > 0 :
+                return Response(json.dumps(error), status=200, mimetype='application/json')
+
+            pgdb.updateSensorsFromRoom(roomid, details)
+            return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
 
 ##################################################
 #---------User data exposure endpoints-----------#
