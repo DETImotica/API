@@ -42,7 +42,6 @@ class DataDB(object):
 
     # Get a set of metrics from a sensor
     def query_interval(self, id, int1, int2):
-        print("sensor_query: ", (id, int1, int2))
         if not int1 or not int2:
             return json.dumps({"values": []})
 
