@@ -19,7 +19,7 @@ import requests
 
 from flask import Flask, abort, flash, jsonify, redirect, Response, request, session
 from flask_paranoid import Paranoid
-from flask_swagger import swagger
+from flasgger import Swagger, swag_from
 from flask_wtf.csrf import CSRFProtect
 from requests_oauthlib import OAuth1
 
@@ -58,6 +58,25 @@ influxdb = DataDB()
 # Default responses
 RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
 
+app.config['SWAGGER'] = {
+    "specs": [
+        {
+            "endpoint": "spec",
+            "route": "/docs/spec",
+            "rule_filter": lambda rule: True,  # all in
+            "model_filter": lambda tag: True,  # all in
+        }
+    ],
+    "static_url_path": "/docs/static",
+    "swagger_ui": True,
+    "specs_route": "/docs/",
+    'title': TITLE,
+    'version': VERSION,
+    'description': f"DETImotica REST backend API version {VERSION}",
+    'uiversion': 3
+}
+swagger = Swagger(app)
+
 # Make sure user is logged in to access user data
 def auth_only(f):
     @wraps(f)
@@ -81,20 +100,12 @@ def index():
 
     return f"DETImotica API {VERSION}", 200
 
-@app.route("/spec")
-def spec():
-    '''Swagger UI wrapper endpoint'''
-    swag_obj = swagger(app)
-    swag_obj['info']['title'] = TITLE
-    swag_obj['info']['description'] = f"DETImotica REST backend API version {VERSION}."
-    swag_obj['info']['version'] = VERSION
-    return jsonify(swag_obj)
-
 ####################################################
-#---------Indentity UA OAuth 1.0a endpoints--------#
+#---------Identity UA OAuth 1.0a endpoints---------#
 ####################################################
 
 @app.route("/login")
+@swag_from('docs/session/login.yml')
 def login():
     """
     OAuth Authentication/Authorization endpoint.
@@ -120,8 +131,11 @@ def login():
     return redirect(f"http://identity.ua.pt/oauth/authorize?oauth_token={req_t}&oauth_token_secret={req_s}", 307)
 
 @app.route("/auth_callback")
+@swag_from('docs/session/auth_callback.yml')
 def auth_callback():
-    '''OAuth callback endpoint (after end-user authorization phase)'''
+    '''
+    OAuth callback endpoint (after end-user authorization phase)
+    '''
 
     ov = request.args.get('oauth_verifier')
     ot = request.args.get('oauth_token')
@@ -171,8 +185,11 @@ def auth_callback():
     return Response("LOGIN OK", status=200)
 
 @app.route("/logout")
+@swag_from('docs/session/logout.yml')
 def logout():
-    '''Logout endpoint'''
+    '''
+    Logout endpoint
+    '''
 
     session.clear()
     return Response("Logout successful.",status=200)
@@ -183,21 +200,29 @@ def logout():
 ##################################################
 
 @app.route("/rooms", methods=['GET'])
+@swag_from('docs/rooms/rooms.yml')
 def rooms():
+    '''
+    todo
+    '''
     dic = {}
     dic.update(ids = pgdb.getRooms())
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 
 @app.route("/room", methods=['POST'])
-
-#Error cases
-# 1 - at least one of the sensors is already linked to a room
-# 2 - at least one of the sensors doesnt exist
-
-#In a valid case we send the id of the new room
-
+@swag_from('docs/rooms/room.yml')
 def newroom():
+    '''
+    todo
+    '''
+
+    # Error cases
+    # 1 - at least one of the sensors is already linked to a room
+    # 2 - at least one of the sensors doesnt exist
+
+    # In a valid case we send the id of the new room
+
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
@@ -217,7 +242,13 @@ def newroom():
 
 
 @app.route("/room/<roomid>", methods=['GET', 'POST', 'DELETE'])
+@swag_from('docs/rooms/room_roomid_get.yml', methods=['GET'])
+@swag_from('docs/rooms/room_roomid_post.yml', methods=['POST'])
+@swag_from('docs/rooms/room_roomid_delete.yml', methods=['DELETE'])
 def room_id(roomid):
+    '''
+    todo
+    '''
     if request.method == 'GET':
         #TODO podemos depois aquilo restringir com as politicas as info das salas
         return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
@@ -232,7 +263,13 @@ def room_id(roomid):
 
 
 @app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
+@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
+@swag_from('docs/rooms/room_sensors_post.yml', methods=['POST'])
 def sensors_room_id(roomid):
+    '''
+    todo
+    '''
+
     if request.method == 'GET':
         dic = {}
         dic.update(ids = pgdb.getSensorsFromRoom(roomid))
@@ -249,13 +286,19 @@ def sensors_room_id(roomid):
 ##################################################
 
 @app.route("/users", methods=['GET'])
+@swag_from('docs/users/users.yml')
 def users():
-    '''Get all users (pelo menos uma chave) from the database --> getUsers(bd).'''
+    '''
+    Get all users (pelo menos uma chave) from the database --> getUsers(bd)
+    '''
     return jsonify(RESP_501), 501
 
 @app.route("/user/<internalid>", methods=['POST'])
+@swag_from('docs/users/user.yml')
 def user_policy(internalid):
-    '''change access policy on the database from the JSON received.'''
+    '''
+    Change access policy on the database from the JSON received.
+    '''
     return jsonify(RESP_501), 501
 
 
@@ -264,20 +307,31 @@ def user_policy(internalid):
 ################################################## #"Authorization": "Basic ZGV0aW1vdGljOnNRV3N4VzVkVFE4N0pQTGY=", "Host" : "iot.av.it.pt", "Accept": "*/*"
 
 @app.route("/sensors", methods=['GET'])
+@swag_from('docs/sensors/sensors.yml')
 def sensors():
-    '''Get the sensors_id for a user from the database --> getAllowedSensors(bd, user_email).'''
+    '''
+    Get the sensors_id for a user from the database --> getAllowedSensors(bd, user_email)
+    '''
     return jsonify(RESP_501), 501
 
 
 @app.route("/types", methods=['GET'])
+@swag_from('docs/sensors/types.yml')
 def types():
-    '''Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)'''
+    '''
+    Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)
+    '''
     return jsonify(RESP_501), 501
 
 
 @app.route("/sensor", methods=['GET', 'POST'])
+@swag_from('docs/sensors/sensor_get.yml', methods=['GET'])
+@swag_from('docs/sensors/sensor_post.yml', methods=['POST'])
 @csrf.exempt
 def new_sensor():
+    '''
+    todo
+    '''
     id = uuid.uuid4()
     details = request.json
     #TODO Veficar se a pessoa é um admin
@@ -294,7 +348,13 @@ def new_sensor():
 
 
 @app.route("/sensor/<sensorid>", methods=['GET', 'POST', 'DELETE'])
+@swag_from('docs/sensors/sensor_sensorid_get.yml', methods=['GET'])
+@swag_from('docs/sensors/sensor_sensorid_post.yml', methods=['POST'])
+@swag_from('docs/sensors/sensor_sensorid_delete.yml', methods=['DELETE'])
 def sensor_description(sensorid):
+    '''
+    todo
+    '''
     if request.method == 'GET':
         return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
 
@@ -308,8 +368,11 @@ def sensor_description(sensorid):
 
 
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
+@swag_from('docs/sensors/sensor_measure.yml')
 def sensor_measure(sensorid, option):
-    '''Verify if the sensor supports a "measure" from database getTypeFromSensor()'''
+    '''
+    Verify if the sensor supports a "measure" from database getTypeFromSensor()
+    '''
     if option == "instant":
         return Response(influxdb.query_last(sensorid), status=200, mimetype='application/json')
     if option == "interval":
@@ -323,8 +386,11 @@ def sensor_measure(sensorid, option):
     return Response(jsonify(RESP_501), status=501, mimetype='application/json')
 
 @app.route("/sensor/<sensorid>/event/<option>", methods=['GET'])
+@swag_from('docs/sensors/sensor_event.yml')
 def sensor_event(sensorid, option):
-    '''Verify if the sensor supports "Events" from database'''
+    '''
+    Verify if the sensor supports "Events" from database
+    '''
     # get data from influx
     return jsonify(RESP_501), 501
 
