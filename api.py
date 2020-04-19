@@ -342,7 +342,7 @@ def new_sensor():
     #if response.status_code == 409:
     #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
-    if not pgdb.datatypeExist(details["data"]["type"]):
+    if not pgdb.datatypeExists(details["data"]["type"]):
         return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
 
     if "room_id" in details:
@@ -373,7 +373,7 @@ def sensor_description(sensorid):
             return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
 
 
-        if "data" in details and "type" in details["data"] and not pgdb.datatypeExist(details["data"]["type"]):
+        if "data" in details and "type" in details["data"] and not pgdb.datatypeExists(details["data"]["type"]):
             return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
 
         if "room_id" in details:
