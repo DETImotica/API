@@ -57,7 +57,7 @@ def graf_query():
         time_st= convert_to_time_ms(req['range']['from'])
         time_end= convert_to_time_ms(req['range']['to'])
         while(time_st<= time_end):
-            query= influxdb.query_avg(t,datetime.datetime.fromtimestamp(time_st), datetime.datetime.fromtimestamp(time_st+req["intervalMs"]))
+            query= influxdb.query_avg(t,datetime.fromtimestamp(time_st/1000.0), datetime.fromtimestamp((time_st+req["intervalMs"])/1000.0))
             time_st+= req["intervalMs"]
             result= json.loads(query)['values']
             datapoints.append([result['value'],convert_to_time_ms(result['time'])])

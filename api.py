@@ -73,6 +73,7 @@ app.config['SWAGGER'] = {
     ],
     "static_url_path": "/docs/static",
     "swagger_ui": True,
+    "termsOfService": '',
     "basePath": f"/{APP_BASE_ENDPOINT}/{VERSION}/",
     "specs_route": "/docs/",
     'title': TITLE,
@@ -126,9 +127,9 @@ def login():
                      )
 
     resp = requests.post("https://identity.ua.pt/oauth/request_token", auth=oauth_p1)
-    
+
     if resp.status_code != 200:
-        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>", 
+        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",
                         status=resp.status_code
                         )
 
@@ -150,7 +151,7 @@ def auth_callback():
 
     if request.args.get('consent'):
         return Response("OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>", status=401)
-    
+
     rt = session.pop('_rt')
     oauth_access =  OAuth1(ck,
                            client_secret=cs,
@@ -167,7 +168,7 @@ def auth_callback():
 
     if not resp_json:
         return Response(f"Error.\nServer returned: <b>{resp.content.decode()}</b>", status=resp.status_code)
-    
+
     try:
         at = resp_json['oauth_token'][0]
         ats = resp_json['oauth_token_secret'][0]
@@ -177,7 +178,7 @@ def auth_callback():
 
     oauth_data = OAuth1(ck,
                         client_secret=cs,
-                        resource_owner_key=at,  
+                        resource_owner_key=at,
                         resource_owner_secret=ats,
                         signature_method=OAUTH_SIGNATURE,
                         nonce=str(random.getrandbits(64)),
@@ -195,12 +196,12 @@ def auth_callback():
     session['token'] = at
     session['secret'] = ats
 
-    # add user if it doesn't exist. If it does, 
+    # add user if it doesn't exist. If it does,
     if (influxdb.has_user(uuid)):
         pass
     else:
         influxdb.add_user(uuid, uemail)
-    
+
     return Response("LOGIN OK", status=200)
 
 @app.route("/logout")
@@ -534,14 +535,14 @@ def sensor_event(sensorid, option):
 ####################################################
 
 # run self-signed and self-managed PKI instead of self-signed certificate
-# (or a real cert?) 
+# (or a real cert?)
 if __name__ == "__main__":
     try:
         config.read(".appconfig")
 
         app.config['SECRET_KEY'] = config['info']['app_key']
         app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
-        
+
         csrf.init_app(app)
         paranoid.init_app(app)
         app.run(host='0.0.0.0', port=443, ssl_context=('cert.pem', 'key.pem'))
