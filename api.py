@@ -375,7 +375,10 @@ def sensors():
     '''
     Get the sensors_id for a user from the database --> getAllowedSensors(bd, user_email)
     '''
-    return jsonify(RESP_501), 501
+    s_list = pgdb.getAllSensors()
+    d = {"ids" : [tuplo[0] for tuplo in s_list]} #{"ids" : [uuid1, uuid2]}
+    # TODO Aplicar politicas para saber quais são os Sensores que o User tem acesso
+    return Response(json.dumps(d), status=200, mimetype='application/json')
 
 
 @app.route("/types", methods=['GET'])
@@ -384,7 +387,10 @@ def types():
     '''
     Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)
     '''
-    return jsonify(RESP_501), 501
+    t_list = pgdb.getAllSensorTypes()
+    d = {"types" : [tuplo[0] for tuplo in t_list]} # {"types" : ["Temperatura", "Humidade", "Som"]}
+    #TODO Aplicar politicas para saber quais são os tipos que o User pode ter conhecimento
+    return Response(json.dumps(d), status=200, mimetype='application/json')
 
 
 @app.route("/sensor", methods=['POST'])

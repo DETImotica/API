@@ -156,7 +156,23 @@ class PGDB(object):
     def isAdmin(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT admin FROM Utilizador WHERE uuid = '%s';", (userid,))
+        cursor.execute("SELECT admin FROM Utilizador WHERE uuid = %s;", (userid,))
         res = cursor.fetchone()
         db_con.close()
         return bool(res[0])
+
+    def getAllSensorTypes(self):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Nome FROM TipoSensor;")
+        res = cursor.fetchall()
+        db_con.close()
+        return res
+
+    def getAllSensors(self):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT id FROM Sensor;")
+        res = cursor.fetchall()
+        db_con.close()
+        return res
