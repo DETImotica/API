@@ -1,0 +1,11 @@
+Change access policy on the database from the JSON received
+---
+tags:
+- Users
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+responses:
+  '501':
+    description: Not implemented

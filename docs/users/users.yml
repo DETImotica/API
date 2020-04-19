@@ -1,0 +1,11 @@
+Get all users from the database
+---
+tags:
+- Users
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+responses:
+  '501':
+    description: Not implemented

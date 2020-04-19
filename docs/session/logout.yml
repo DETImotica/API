@@ -1,0 +1,11 @@
+Logout endpoint
+---
+tags:
+- Session
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+responses:
+  '501':
+    description: Not implemented

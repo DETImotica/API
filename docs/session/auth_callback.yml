@@ -1,0 +1,11 @@
+OAuth callback endpoint (after end-user authorization phase)
+---
+tags:
+- Session
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+responses:
+  '501':
+    description: Not implemented
