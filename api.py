@@ -72,6 +72,7 @@ app.config['SWAGGER'] = {
     ],
     "static_url_path": "/docs/static",
     "swagger_ui": True,
+    "basePath": "/api/v1/",
     "specs_route": "/docs/",
     'title': TITLE,
     'version': VERSION,
