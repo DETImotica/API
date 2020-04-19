@@ -22,3 +22,5 @@ responses:
           type: array
           items:
             $ref: "#/definitions/uuid"
+  '404':
+    description: The specified room was not found

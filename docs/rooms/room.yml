@@ -8,7 +8,7 @@ definitions:
       name:
         type: string
         description: Room's name
-        example: '040101'
+        example: '4.1.01'
       description:
         type: string
         description: Room's description

@@ -1,11 +1,64 @@
-todo
+Get data measured by a given sensor
 ---
 tags:
 - Sensors
+definitions:
+  sensor_measurement:
+    properties:
+      time:
+        type: string
+        format: date-time
+        example: '2020-04-19T13:31:12.213Z'
+      value:
+        type: float
+        example: 7
+parameters:
+  - name: sensorid
+    in: path
+    type: string
+    description: uuid of the desired sensor
+    required: true
+  - name: option
+    in: path
+    required: true
+    type: string
+    enum: [instant, interval, mean]
+    description: >
+      Desired mode of data selection/aggregation:
+        * `instant` - Latest instantaneous value
+        * `interval` - List of all values within required 'start' and 'end' timestamps
+        * `mean` - Mean of all values within required 'start' and 'end' timestamps
+
+      If 'end' is not specified, current date-time is assumed
+  - name: start
+    in: query
+    type: string
+    format: date-time
+    description: Start date for 'interval' or 'mean' options in UTC timezone (required if using said options)
+    schema:
+      example: '2020-04-10T15:32:28Z'
+  - name: end
+    in: query
+    type: string
+    format: date-time
+    description: End date for 'interval' or 'mean' options in UTC timezone
+    schema:
+      example: '2020-04-19T15:32:28Z'
+
 consumes:
 - application/x-www-form-urlencoded
 produces:
 - application/json
 responses:
-  '501':
-    description: Not implemented
+  '200':
+    description: Returns specified measurement data
+    schema:
+      properties:
+        values:
+          type: array
+          items:
+            $ref: "#/definitions/sensor_measurement"
+  '400':
+    description: option does not exist or start was required and not specified
+  '404':
+    description: The specified sensor was not found

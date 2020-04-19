@@ -43,3 +43,5 @@ responses:
           $ref: "#/definitions/uuid"
   '400':
     description: Either a sensor in the 'add' list doesn't exist or is already in the room or a sensor in the 'delete' list is not in the room
+  '404':
+    description: The specified room was not found
