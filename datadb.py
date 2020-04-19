@@ -44,7 +44,7 @@ class DataDB(object):
     def query_interval(self, id, int1, int2):
         print("sensor_query: ", (id, int1, int2))
         if not int1 or not int2:
-            return json.dumps({})
+            return json.dumps({"values": []})
 
         influx_conn = self._open()
 
@@ -62,7 +62,7 @@ class DataDB(object):
     # Query the average of a set of values
     def query_avg(self, id, int1, int2):
         if not int1 or not int2:
-            return json.dumps({})
+            return json.dumps({"values": []})
         
         influx_conn = self._open()
 
@@ -72,7 +72,7 @@ class DataDB(object):
             influx_conn.close()
             return json.dumps(dict({'values': [{"time": p['time'], "value": p['value']}]}))
         influx_conn.close()
-        return json.dumps({})
+        return json.dumps({"values": []})
 
     # Query users in the database
     def query_users(self):
