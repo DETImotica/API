@@ -420,7 +420,14 @@ def sensor_description(sensorid):
 
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
 def sensor_measure(sensorid, option):
+    #TODO Verificar se o User tem acesso ao sensor
     '''Verify if the sensor supports a "measure" from database getTypeFromSensor()'''
+
+    try:
+        pgdb.isSensorFree(sensorid)
+    except:
+        return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=400,mimetype='application/json')
+
     if option == "instant":
         return Response(influxdb.query_last(sensorid), status=200, mimetype='application/json')
     if option == "interval":
