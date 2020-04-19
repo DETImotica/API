@@ -7,7 +7,7 @@ import json
 
 from calendar import timegm
 from datetime import datetime
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, jsonify, request, Response, abort
 from flask_cors import CORS
 
 from pgdb import PGDB
@@ -32,14 +32,14 @@ def graf_root():
 
 @grafana.route('/search', methods=['POST'])
 def graf_search():
-    #rooms= pgdb.getRooms()
-    rooms= [('1')]
+    rooms= pgdb.getRooms()
+    #rooms= [('1')]
     res= []
     for r in rooms:
-        #sensors= pgdb.getSensorsFromRoom(r)
-        sensors= [uuid.UUID('55fbf7d0-cc47-4642-9290-a493d383ad8c'),uuid.UUID('e7cdb45b-e370-4d74-bb3a-8ebe7527e458')]
+        sensors= pgdb.getSensorsFromRoom(r)
+        #sensors= [uuid.UUID('55fbf7d0-cc47-4642-9290-a493d383ad8c'),uuid.UUID('e7cdb45b-e370-4d74-bb3a-8ebe7527e458')]
         for s in sensors:
-            res.append('Room'+r+'_'+str(s))
+            res.append('Room'+pgdb.getRoom(r)['name']+'_'+str(s)+' ('+pgdb.getSensor(s)['data']['type']+')')
     return jsonify(res)
 
 @grafana.route('/query', methods=['POST'])
@@ -48,21 +48,23 @@ def graf_query():
     targets= []
     for t in req['targets']:
         if 'target' in t.keys():
-            targets.append((t['target']).split('_')[1])
+            targets.append(((t['target']).split('_')[1]).split('(')[0])
     if targets == []:
         return jsonify([])
-    time_st= req['range']['from']
-    time_end= req['range']['to']
     res= []
     for t in targets:
-        query= influxdb.query_interval(t,time_st,time_end)
-        result= json.loads(query)['values']
         datapoints= []
-        for r in result:
-            datapoints.append([r['value'],convert_to_time_ms(r['time'])])
+        time_st= convert_to_time_ms(req['range']['from'])
+        time_end= convert_to_time_ms(req['range']['to'])
+        while(time_st<= time_end):
+            query= influxdb.query_avg(t,datetime.datetime.fromtimestamp(time_st), datetime.datetime.fromtimestamp(time_st+req["intervalMs"]))
+            time_st+= req["intervalMs"]
+            result= json.loads(query)['values']
+            datapoints.append([result['value'],convert_to_time_ms(result['time'])])
         res.append({"target":t,"datapoints":datapoints})    
     return jsonify(res)
 
 @grafana.route('/annotations', methods=['POST'])
 def graf_annotations():
+    #TODO for M4 (Annotations for outages,...)
     return jsonify([])    
