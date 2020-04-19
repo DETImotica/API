@@ -72,7 +72,7 @@ app.config['SWAGGER'] = {
     ],
     "static_url_path": "/docs/static",
     "swagger_ui": True,
-    "basePath": "/api/v1/",
+    "basePath": f"/{APP_BASE_ENDPOINT}/{VERSION}/",
     "specs_route": "/docs/",
     'title': TITLE,
     'version': VERSION,
@@ -244,13 +244,21 @@ def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
+    if "name" not in details or "description" not in details:
+        return Response(json.dumps({"error_description" : "Room details incomplete"}), status=400, mimetype='application/json')
+
+    if len(details["name"])>50 or len(details["description"])>50 :
+        return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
     error = {"non_existent": [], "non_free": [], "error_description": "Some of the sensors does not exist or are not free"}
-    for s in details["sensors"]:
-        try:
-            if (not pgdb.isSensorFree(s)):
-                error["non_free"].append(s)
-        except:
-            error["non_existent"].append(s)
+
+    if sensors in details:
+        for s in details["sensors"]:
+            try:
+                if (not pgdb.isSensorFree(s)):
+                    error["non_free"].append(s)
+            except:
+                error["non_existent"].append(s)
 
     if(error["non_existent"] != [] or error["non_free"] != []):
         return Response(json.dumps(error), status=400, mimetype='application/json')
@@ -274,18 +282,18 @@ def room_id(roomid):
         return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
 
 
-
-
     if request.method == 'POST':
-        new_details = request.json #{name: "", description: ""}
-        if (len(new_details["name"])>50 or len(new_details["description"]>50)):
-            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=200, mimetype='application/json')
+        new_details = request.json #{name: "", description: ""}"
+        if ("name" in new_details and (new_details["name"])>50):
+            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+        if ("description" in new_details and (new_details["description"]>50)):
+            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
         if pgdb.roomExists(roomid):
             # TODO podemos depois aquilo restringir com as politicas as info das salas
             pgdb.updateRoom(roomid, new_details)
             return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=200, mimetype='application/json')
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
 
     #TODO remover salas
     return jsonify(RESP_501), 501
@@ -388,13 +396,20 @@ def new_sensor():
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
     #TODO Veficar se a pessoa é um admin
 
-    #TODO Verificar se os campos estao todos, e ainda verifcar se cabem na base de dados
+    if "description" not in details or "data" not in details:
+        return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
 
-    #url = "http://iot.av.it.pt/device/standalone"
-    #data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
-    #response = requests.post(url, headers={"Content-Type": "application/json"}, auth=("detimotic", "<pass>"), data=json.dumps(data_influx))
-    #if response.status_code == 409:
-    #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
+    if len(details["description"])>50:
+        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400,mimetype='application/json')
+
+    if "type" not in details["data"] or "unit_symbol" not in details["data"]:
+        return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
+
+    if len(details["data"]["type"])>50:
+        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400,mimetype='application/json')
+
+    if len(details["data"]["unit_symbol"])>3:
+        return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}), status=400,mimetype='application/json')
 
     if not pgdb.datatypeExists(details["data"]["type"]):
         return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
@@ -402,6 +417,12 @@ def new_sensor():
     if "room_id" in details:
         if not pgdb.roomExists(details["room_id"]):
             return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+
+    # url = "http://iot.av.it.pt/device/standalone"
+    # data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
+    # response = requests.post(url, headers={"Content-Type": "application/json"}, auth=("detimotic", "<pass>"), data=json.dumps(data_influx))
+    # if response.status_code == 409:
+    #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
     pgdb.createSensor(id, details)
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
@@ -432,9 +453,23 @@ def sensor_description(sensorid):
         except:
             return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
 
+        if len(details["description"]) > 50:
+            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
+
+        if "data" in details:
+            if "type" in details["data"]:
+                    if not pgdb.datatypeExist(details["data"]["type"]):
+                        return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+                    if len(details["data"]["type"])>50:
+                        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
+            if "unit_symbol" in details["data"]:
+                    if len(details["data"]["unit_symbol"])>3:
+                        return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}),status=400, mimetype='application/json')
+
 
         if "data" in details and "type" in details["data"] and not pgdb.datatypeExists(details["data"]["type"]):
             return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+
 
         if "room_id" in details:
             if not pgdb.roomExists(details["room_id"]):
@@ -450,9 +485,14 @@ def sensor_description(sensorid):
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
 @swag_from('docs/sensors/sensor_measure.yml')
 def sensor_measure(sensorid, option):
-    '''
-    Verify if the sensor supports a "measure" from database getTypeFromSensor()
-    '''
+    #TODO Verificar se o User tem acesso ao sensor
+    '''Verify if the sensor supports a "measure" from database getTypeFromSensor()'''
+
+    try:
+        pgdb.isSensorFree(sensorid)
+    except:
+        return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=400,mimetype='application/json')
+
     if option == "instant":
         return Response(influxdb.query_last(sensorid), status=200, mimetype='application/json')
     if option == "interval":
