@@ -1,0 +1,45 @@
+Update the list of sensors in a given room
+---
+tags:
+- Rooms
+definitions:
+  sensors_update:
+    properties:
+      add:
+        type: array
+        description: List of the sensor_id's of all the sensors to add to the room
+        items:
+          $ref: "#/definitions/uuid"
+      remove:
+        type: array
+        description: List of the sensor_id's of all the sensors to remove from the room
+        items:
+          $ref: "#/definitions/uuid"
+consumes:
+- application/json
+produces:
+- application/json
+parameters:
+  - name: roomid
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+  - in: body
+    name: body
+    description: Information on the sensors to add and/or delete
+    required: true
+    schema:
+        properties:
+          sensors:
+            $ref: '#/definitions/sensors_update'
+responses:
+  '200':
+    description: Returns the room's ID
+    schema:
+      id: new_room_id
+      properties:
+        id:
+          $ref: "#/definitions/uuid"
+  '400':
+    description: Either a sensor in the 'add' list doesn't exist or is already in the room or a sensor in the 'delete' list is not in the room

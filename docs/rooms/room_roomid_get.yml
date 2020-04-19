@@ -1,0 +1,11 @@
+todo
+---
+tags:
+    - Rooms
+consumes:
+    - application/x-www-form-urlencoded
+produces:
+    - application/json
+responses:
+  '200':
+    description: Not implemented

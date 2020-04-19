@@ -1,0 +1,11 @@
+Get all types of sensors for a user from the database
+---
+tags:
+- Sensors
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+responses:
+  '501':
+    description: Not implemented
