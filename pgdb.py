@@ -112,7 +112,7 @@ class PGDB(object):
     def isSensorFree(self, sensorid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id='%s';", (sensorid,))
+        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id=%s;", (sensorid,))
         result = cursor.fetchone()
 
         if result == None :
@@ -124,7 +124,7 @@ class PGDB(object):
     def isSensorRoom(self, sensorid, roomid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id='%s';", (sensorid,))
+        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id=%s;", (sensorid,))
         result = cursor.fetchone()
 
         if result == None :
