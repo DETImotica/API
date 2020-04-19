@@ -7,7 +7,7 @@ import json
 
 from calendar import timegm
 from datetime import datetime
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, jsonify, request, Response, abort
 from flask_cors import CORS
 
 from pgdb import PGDB
@@ -48,6 +48,7 @@ def graf_query():
     targets= []
     for t in req['targets']:
         if 'target' in t.keys():
+<<<<<<< HEAD
             targets.append(((t['target']).split('_')[1]).split(' (')[0])
     if targets == []:
         return jsonify([])
@@ -61,10 +62,30 @@ def graf_query():
         for r in result:
             datapoints.append([r['value'],convert_to_time_ms(r['time'])])
         res.append({"target":t,"datapoints":datapoints})
+=======
+            targets.append(((t['target']).split('_')[1]).split('(')[0])
+    if targets == []:
+        return jsonify([])
+    res= []
+    for t in targets:
+        datapoints= []
+        time_st= convert_to_time_ms(req['range']['from'])
+        time_end= convert_to_time_ms(req['range']['to'])
+        while(time_st<= time_end):
+            query= influxdb.query_avg(t,datetime.datetime.fromtimestamp(time_st), datetime.datetime.fromtimestamp(time_st+req["intervalMs"]))
+            time_st+= req["intervalMs"]
+            result= json.loads(query)['values']
+            datapoints.append([result['value'],convert_to_time_ms(result['time'])])
+        res.append({"target":t,"datapoints":datapoints})    
+>>>>>>> 337ae8c814cab44d747cca3b9797f00eac9de9d7
     return jsonify(res)
 
 @grafana.route('/annotations', methods=['POST'])
 def graf_annotations():
+    #TODO for M4 (Annotations for outages,...)
     return jsonify([])    
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 337ae8c814cab44d747cca3b9797f00eac9de9d7
