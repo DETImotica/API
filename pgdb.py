@@ -81,11 +81,11 @@ class PGDB(object):
     def getSensor(self, sensorid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT Sensor.Descricao,Nome_TipoSensor,Simbolo,Nome,Espaco.Descricao FROM Sensor JOIN Espaco ON Sensor.ID_Espaco=Espaco.ID WHERE Sensor.ID = %s",  (sensorid,))
+        cursor.execute("SELECT Sensor.Descricao,Nome_TipoSensor,Simbolo,Espaco.ID FROM Sensor JOIN Espaco ON Sensor.ID_Espaco=Espaco.ID WHERE Sensor.ID = %s",  (sensorid,))
         result = cursor.fetchone()
         result = {"description" : result[0],
                 "data" : { "type": result[1], "unit_symbol": result[2]},
-                "room" : { "name": result[3], "description": result[4]}
+                "room_id": result[3]
                 }
         db_con.close()
         return result

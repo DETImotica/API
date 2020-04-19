@@ -16,6 +16,7 @@ import uuid
 from functools import wraps
 from urllib.parse import parse_qs
 import requests
+import datetime
 
 from flask import Flask, abort, flash, g, jsonify, redirect, Response, request, session
 from flask_paranoid import Paranoid
@@ -279,7 +280,7 @@ def room_id(roomid):
         if pgdb.roomExists(roomid):
             #TODO podemos depois aquilo restringir com as politicas as info das salas
             return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
 
     if request.method == 'POST':
@@ -293,7 +294,7 @@ def room_id(roomid):
             # TODO podemos depois aquilo restringir com as politicas as info das salas
             pgdb.updateRoom(roomid, new_details)
             return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
     #TODO remover salas
     return jsonify(RESP_501), 501
@@ -314,7 +315,7 @@ def sensors_room_id(roomid):
             dic.update(ids = pgdb.getSensorsFromRoom(roomid))
             # TODO verificar quais sensores o user tem acesso
             return Response(json.dumps(dic), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=400, mimetype='application/json')
+        return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=404, mimetype='application/json')
 
     if request.method == 'POST':
         if pgdb.roomExists(roomid):
@@ -412,11 +413,11 @@ def new_sensor():
         return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}), status=400,mimetype='application/json')
 
     if not pgdb.datatypeExists(details["data"]["type"]):
-        return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+        return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
 
     if "room_id" in details:
         if not pgdb.roomExists(details["room_id"]):
-            return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+            return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
     # url = "http://iot.av.it.pt/device/standalone"
     # data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
@@ -442,7 +443,7 @@ def sensor_description(sensorid):
             pgdb.isSensorFree(sensorid)
             return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
         except:
-            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
 
     if request.method == 'POST':
         details = request.json #{"description": "", "data" : { "type" : "", "unit_symbol" : ""}, room_id: ""}
@@ -451,7 +452,7 @@ def sensor_description(sensorid):
         try:
             pgdb.isSensorFree(sensorid)
         except:
-            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
 
         if len(details["description"]) > 50:
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
@@ -459,7 +460,7 @@ def sensor_description(sensorid):
         if "data" in details:
             if "type" in details["data"]:
                     if not pgdb.datatypeExist(details["data"]["type"]):
-                        return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+                        return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
                     if len(details["data"]["type"])>50:
                         return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
             if "unit_symbol" in details["data"]:
@@ -468,12 +469,12 @@ def sensor_description(sensorid):
 
 
         if "data" in details and "type" in details["data"] and not pgdb.datatypeExists(details["data"]["type"]):
-            return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+            return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
 
 
         if "room_id" in details:
             if not pgdb.roomExists(details["room_id"]):
-                return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+                return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
         pgdb.updateSensor(sensorid, details)
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
@@ -491,19 +492,34 @@ def sensor_measure(sensorid, option):
     try:
         pgdb.isSensorFree(sensorid)
     except:
-        return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=400,mimetype='application/json')
+        return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=404,mimetype='application/json')
+
+    #TODO Verificar se o intervalo é válido para o influx
 
     if option == "instant":
         return Response(influxdb.query_last(sensorid), status=200, mimetype='application/json')
     if option == "interval":
         extremo_min = request.args.get('start')
+        if extremo_min == None:
+            return Response(json.dumps({"error_description": "The start parameter was not specified"}), status=400, mimetype='application/json')
+
         extremo_max = request.args.get('end')
+        if extremo_max == None:
+            extremo_max = datetime.datetime.utcnow().isoformat("T")+"Z"
         return Response(influxdb.query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+
+
     if option == "mean":
         extremo_min = request.args.get('start')
+        if extremo_min == None:
+            return Response(json.dumps({"error_description": "The start parameter was not specified"}), status=400,
+                            mimetype='application/json')
+
         extremo_max = request.args.get('end')
+        if extremo_max == None:
+            extremo_max = datetime.datetime.utcnow().isoformat("T") + "Z"
         return Response(influxdb.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
-    return Response(jsonify(RESP_501), status=501, mimetype='application/json')
+    return Response(json.dumps({"error_description" : "Option does not exist"}), status=404, mimetype='application/json')
 
 @app.route("/sensor/<sensorid>/event/<option>", methods=['GET'])
 @swag_from('docs/sensors/sensor_event.yml')
