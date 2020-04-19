@@ -48,21 +48,6 @@ def graf_query():
     targets= []
     for t in req['targets']:
         if 'target' in t.keys():
-<<<<<<< HEAD
-            targets.append(((t['target']).split('_')[1]).split(' (')[0])
-    if targets == []:
-        return jsonify([])
-    time_st= req['range']['from']
-    time_end= req['range']['to']
-    res= []
-    for t in targets:
-        query= influxdb.query_interval(str(t),time_start,time_end)
-        result= json.loads(query)['values']
-        datapoints= []
-        for r in result:
-            datapoints.append([r['value'],convert_to_time_ms(r['time'])])
-        res.append({"target":t,"datapoints":datapoints})
-=======
             targets.append(((t['target']).split('_')[1]).split('(')[0])
     if targets == []:
         return jsonify([])
@@ -77,15 +62,9 @@ def graf_query():
             result= json.loads(query)['values']
             datapoints.append([result['value'],convert_to_time_ms(result['time'])])
         res.append({"target":t,"datapoints":datapoints})    
->>>>>>> 337ae8c814cab44d747cca3b9797f00eac9de9d7
     return jsonify(res)
 
 @grafana.route('/annotations', methods=['POST'])
 def graf_annotations():
     #TODO for M4 (Annotations for outages,...)
     return jsonify([])    
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 337ae8c814cab44d747cca3b9797f00eac9de9d7
