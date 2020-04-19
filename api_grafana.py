@@ -48,7 +48,7 @@ def graf_query():
     targets= []
     for t in req['targets']:
         if 'target' in t.keys():
-            targets.append(((t['target']).split('_')[1]).split('(')[0])
+            targets.append(((t['target']).split('_')[1]).split(' (')[0])
     if targets == []:
         return jsonify([])
     res= []
@@ -57,10 +57,11 @@ def graf_query():
         time_st= convert_to_time_ms(req['range']['from'])
         time_end= convert_to_time_ms(req['range']['to'])
         while(time_st<= time_end):
-            query= influxdb.query_avg(t,datetime.fromtimestamp(time_st/1000.0), datetime.fromtimestamp((time_st+req["intervalMs"])/1000.0))
+            query= json.loads(influxdb.query_avg(t,datetime.fromtimestamp(time_st/1000.0), datetime.fromtimestamp((time_st+req["intervalMs"])/1000.0)))
             time_st+= req["intervalMs"]
-            result= json.loads(query)['values']
-            datapoints.append([result['value'],convert_to_time_ms(result['time'])])
+            if query != {}:
+                result= query['values']
+                datapoints.append([result[0]['value'],convert_to_time_ms(result[0]['time'])])
         res.append({"target":t,"datapoints":datapoints})    
     return jsonify(res)
 
