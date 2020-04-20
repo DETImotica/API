@@ -54,14 +54,15 @@ def graf_query():
     res= []
     for t in targets:
         datapoints= []
-        time_st= convert_to_time_ms(req['range']['from'])
-        time_end= convert_to_time_ms(req['range']['to'])
-        while(time_st<= time_end):
-            query= json.loads(influxdb.query_avg(t,datetime.fromtimestamp(time_st/1000.0), datetime.fromtimestamp((time_st+req["intervalMs"])/1000.0)))
-            time_st+= req["intervalMs"]
-            if query != {}:
-                result= query['values']
-                datapoints.append([result[0]['value'],convert_to_time_ms(result[0]['time'])])
+        time_st= req['range']['from']
+        time_end= req['range']['to']
+        try:
+            query= json.loads(influxdb.query_avg(t,time_st, time_end,req['interval'],req['maxDataPoints']))
+        except ValueError:
+            abort('404', Exception('Received object is not in correct format.'))
+        result= query['values']
+        for r in result:
+            datapoints.append([r['value'],convert_to_time_ms(r[0]['time'])])
         res.append({"target":t,"datapoints":datapoints})    
     return jsonify(res)
 
