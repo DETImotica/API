@@ -97,8 +97,8 @@ def before_req_f():
     if request.endpoint == "login":
         if session.get('user'):
             flash(f"You are already logged in as {session.get('user')}.")
-            if request.referrer:
-                return redirect(url_for(request.referrer))
+            if request.referer:
+                return redirect(url_for(request.referer))
             else:
                 return redirect(url_for('.index'))
 
