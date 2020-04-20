@@ -100,7 +100,7 @@ def before_req_f():
             if request.referrer:
                 return redirect(url_for(request.referrer))
             else:
-                return redirect(url_for('/'))
+                return redirect(url_for(index))
 
 @app.route("/", methods=['GET', 'HEAD'])
 #@auth_only
@@ -469,7 +469,7 @@ def sensor_description(sensorid):
 
         if "data" in details:
             if "type" in details["data"]:
-                    if not pgdb.datatypeExist(details["data"]["type"]):
+                    if not pgdb.datatypeExists(details["data"]["type"]):
                         return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
                     if len(details["data"]["type"])>50:
                         return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
