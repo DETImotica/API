@@ -100,7 +100,7 @@ def before_req_f():
             if request.referrer:
                 return redirect(url_for(request.referrer))
             else:
-                return redirect(url_for(index))
+                return redirect(url_for('.index'))
 
 @app.route("/", methods=['GET', 'HEAD'])
 #@auth_only
