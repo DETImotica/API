@@ -18,7 +18,7 @@ from urllib.parse import parse_qs
 import requests
 import datetime
 
-from flask import Flask, abort, flash, g, jsonify, redirect, Response, request, session
+from flask import Flask, abort, flash, g, jsonify, redirect, Response, request, session, url_for
 from flask_paranoid import Paranoid
 from flasgger import Swagger, swag_from
 from flask_wtf.csrf import CSRFProtect
@@ -97,7 +97,10 @@ def before_req_f():
     if request.endpoint == "login":
         if session.get('user'):
             flash(f"You are already logged in as {session.get('user')}.")
-            return redirect(request.referrer)
+            if request.referrer:
+                return redirect(url_for(request.referrer))
+            else:
+                return redirect(url_for('/'))
 
 @app.route("/", methods=['GET', 'HEAD'])
 #@auth_only
