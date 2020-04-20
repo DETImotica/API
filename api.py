@@ -95,7 +95,10 @@ def auth_only(f):
 @app.before_request
 def before_req_f():
     if request.endpoint == "login":
-        if session.get('user'):
+        print(session.get('user'))
+        print(session.get('uuid'))
+        print(session.get('token'))
+        if session.get('user') and session.get('uuid') and session.get('token'):
             flash(f"You are already logged in as {session.get('user')}.")
             if request.referer:
                 return redirect(url_for(request.referer))
@@ -194,7 +197,7 @@ def auth_callback():
     uemail = attrs[0]
     uuid = attrs[1]
 
-    session['id'] = uuid
+    session['uuid'] = uuid
     session['user'] = uemail
     session['token'] = at
     session['secret'] = ats
