@@ -98,11 +98,7 @@ def auth_only(f):
 @app.before_request
 def before_req_f():
     if request.endpoint == "login":
-        print(session.get('user'))
-        print(session.get('uuid'))
-        print(session.get('token'))
         if session.get('user') and session.get('uuid') and session.get('token'):
-            flash(f"You are already logged in as {session.get('user')}.")
             if request.referer:
                 return redirect(url_for(request.referer))
             else:
@@ -119,7 +115,8 @@ def index():
 #---------Identity UA OAuth 1.0a endpoints---------#
 ####################################################
 
-@app.route("/login")
+@app.route("/login", methods=['POST'])
+@csrf.exempt
 @swag_from('docs/session/login.yml')
 def login():
     """
@@ -157,6 +154,9 @@ def auth_callback():
 
     ov = request.args.get('oauth_verifier')
     ot = request.args.get('oauth_token')
+
+    if not ov or not ot:
+        return Response("OAuth error.<br>Server returned: <b>Invalid request.</b>", status=400)
 
     if request.args.get('consent'):
         return Response("OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>", status=401)
@@ -214,13 +214,16 @@ def auth_callback():
 
     return Response("LOGIN OK", status=200)
 
-@app.route("/logout")
+@app.route("/logout", methods=['POST'])
+@csrf.exempt
 @swag_from('docs/session/logout.yml')
 def logout():
     '''
     Logout endpoint
     '''
-
+    if not session.get('user') or not session.get('uuid') or not session.get('token'):
+        Response("Logout bad request. Server returned: <b>You are not logged in.<b>",status=400)
+    
     session.clear()
     return Response("Logout successful.",status=200)
 
