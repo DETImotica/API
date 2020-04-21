@@ -63,6 +63,9 @@ influxdb = DataDB()
 RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
 
 app.config['SWAGGER'] = {
+    'ui_params': {
+        'supportedSubmitMethods': ['get']
+    },
     "specs": [
         {
             "endpoint": "spec",
@@ -193,8 +196,9 @@ def auth_callback():
 
     resp = requests.get("https://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : 'uu'})
 
-    attrs = resp.content.decode('utf-8').split("@ua.pt")
-    uemail = attrs[0]
+    print(resp.content.decode())
+    attrs = resp.content.decode().split("@ua.pt")
+    uemail = attrs[0].split('<email>')[1]
     uuid = attrs[1]
 
     session['uuid'] = uuid
