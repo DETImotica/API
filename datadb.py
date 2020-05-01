@@ -70,25 +70,8 @@ class DataDB(object):
                                 + (f"GROUP BY time({group_interval}),* " if group_interval else "")
                                 + (f"LIMIT {limit}" if limit else "")
                                )
-        
+        result = []
         for p in res.get_points():
-            influx_conn.close()
-            return json.dumps(dict({'values': [{"time": p['time'], "value": p['value']}]}))
+            res.append({"time": p['time'], "value": p['value']})    
         influx_conn.close()
-        return json.dumps({"values": []})
-
-    # Query users in the database
-    def query_users(self):
-        influx_conn = self._open()
-        influx_conn.close()
-        return None
-
-    def add_user(self, id, email):
-        influx_conn = self._open()
-        influx_conn.close()
-        return True
-
-    def has_user(self, id):
-        influx_conn = self._open()
-        influx_conn.close()
-        return False
+        return json.dumps({"values": result})

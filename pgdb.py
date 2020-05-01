@@ -176,3 +176,17 @@ class PGDB(object):
         res = cursor.fetchall()
         db_con.close()
         return res
+
+    def addUser(self, id, email, admin=False):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s, %s);", (str(id), str(email), str(admin), 'null'))
+        db_con.close()
+        return True
+
+    def hasUser(self, id):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),))
+        db_con.close()
+        return False

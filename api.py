@@ -12,16 +12,20 @@ import sys
 import time
 import json
 import uuid
+import xmltodict
 
+from collections import OrderedDict
 from functools import wraps
 from urllib.parse import parse_qs
 import requests
 import datetime
 
 from flask import Flask, abort, flash, g, jsonify, redirect, Response, request, session, url_for
+from flask_caching import Cache
 from flask_paranoid import Paranoid
 from flasgger import Swagger, swag_from
 from flask_wtf.csrf import CSRFProtect
+from hashlib import sha3_256
 from requests_oauthlib import OAuth1
 
 from datadb import DataDB
@@ -29,10 +33,16 @@ from pgdb import PGDB
 
 from api_grafana import grafana
 
+class ArgumentException(ValueError):
+    pass
+
 # API global vars
 APP_BASE_ENDPOINT = 'api'
 VERSION = 'v1'
 TITLE = 'DETImotica API'
+_SUPPORTED_SCOPES = ['uu', 'name',
+                     'student_info', 'student_schedule', 'student_courses',
+                     'teacher_schedule', 'teacher_courses']
 
 # Flask global vars
 app = Flask(__name__)
@@ -40,28 +50,10 @@ app.register_blueprint(grafana)
 app.config['JSON_SORT_KEYS'] = False
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-
-
-csrf = CSRFProtect(app)
-csrf.exempt(grafana)
-
-paranoid = Paranoid(app)
-paranoid.redirect_view = "/"
-
-# OAuth global vars
-OAUTH_SIGNATURE = 'HMAC-SHA1'
-config = configparser.ConfigParser()
-
-config.read(".appconfig")
-ck = config['info']['consumer_key']
-cs = config['info']['consumer_secret']
-
-pgdb = PGDB()
-influxdb = DataDB()
-
-# Default responses
-RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
-
+app.config['CACHE_TYPE'] = "filesystem"
+app.config['CACHE_DIR'] = ".app_attr_cache/"
+app.config['CACHE_DEFAULT_TIMEOUT'] = 3600*24
+app.config['CACHE_OPTIONS'] = {'mode': 600}
 app.config['SWAGGER'] = {
     'ui_params': {
         'supportedSubmitMethods': ['get']
@@ -84,28 +76,112 @@ app.config['SWAGGER'] = {
     'description': f"DETImotica REST backend API version {VERSION}",
     'uiversion': 3
 }
+
+csrf = CSRFProtect(app)
+csrf.exempt(grafana)
+
+paranoid = Paranoid(app)
+paranoid.redirect_view = "/"
+
+cache = Cache(app)
+session_cache = Cache(app, config={'CACHE_DIR': ".app_session_cache/",
+                                   'CACHE_DEFAULT_TIMEOUT': 3600*24*30
+                                  })
+
 swagger = Swagger(app)
 
+# OAuth global vars
+OAUTH_SIGNATURE = 'HMAC-SHA1'
+config = configparser.ConfigParser()
+
+config.read(".appconfig")
+ck = config['info']['consumer_key']
+cs = config['info']['consumer_secret']
+
+pgdb = PGDB()
+influxdb = DataDB()
+
+# Default responses
+RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
+
+# attribute dataset methods
+def _simplify_attr_dict(xmldict):
+    res = {}
+
+    for key in xmldict:
+        if key[0] != '@':
+            if isinstance(xmldict[key], OrderedDict):
+                res.update(_simplify_attr_dict(xmldict[key]))
+            elif isinstance(xmldict[key], list):
+                res[key] = [_simplify_attr_dict(item) if isinstance(item, OrderedDict) else item for item in xmldict[key]]
+            else:
+                res[key] = xmldict[key]
+    return res
+
+@cache.memoize(hash_method=sha3_256)
+def _get_attr(scope, at, ats):
+    if not scope or scope not in _SUPPORTED_SCOPES:
+        raise ArgumentException("Invalid scope")
+    if not at:
+        raise ArgumentException("No value for AT")
+    if not ats:
+        raise ArgumentException("No value for AT secret")
+
+    oauth_data = OAuth1(ck,
+                        client_secret=cs,
+                        resource_owner_key=at,
+                        resource_owner_secret=ats,
+                        signature_method=OAUTH_SIGNATURE,
+                        nonce=str(random.getrandbits(64)),
+                        timestamp=str(int(time.time()))
+                        )
+
+    resp = requests.get("https://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : scope})
+
+    if resp.status_code != 200:
+        return None
+
+    return _simplify_attr_dict(xmltodict.parse(resp.content.decode()))
+
+# validate the token
+def _validate_token(uuid, email):
+    at = session_cache.get(uuid)
+    ats = session_cache.get(at)
+
+    if not at or not ats:
+        return False
+
+    uu = _get_attr('uu', at, ats)
+
+    return uu is not None and uuid == uu['iupi'] and email == uu['email']
+
 # Make sure user is logged in to access user data
-def auth_only(f):
+def admin_only(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not session.get('user') or not session.get('id') or not session.get('token'):
+        res = session.get('uuid')
+        if not res:
             abort(401)
+        if not pgdb.isAdmin(res):
+            abort(403)
         return f(*args, **kwargs)
     return wrapper
 
 @app.before_request
 def before_req_f():
-    if request.endpoint == "login":
-        if session.get('user') and session.get('uuid') and session.get('token'):
-            if request.referer:
-                return redirect(url_for(request.referer))
-            else:
-                return redirect(url_for('.index'))
+    print(request.path)
+    if request.path == "/login":
+        if session.get('user') and session.get('uuid'):
+            if _validate_token(session.get('uuid'), session.get('user')):
+                if request.referer:
+                    return redirect(url_for(request.referer))
+                else:
+                    return redirect(url_for('.index'))
+    elif request.path != "/spec" and "grafana" not in request.path:
+        if not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
+            return redirect(url_for('.login'), code=307)
 
 @app.route("/", methods=['GET', 'HEAD'])
-#@auth_only
 def index():
     '''API Root endpoint'''
 
@@ -115,8 +191,7 @@ def index():
 #---------Identity UA OAuth 1.0a endpoints---------#
 ####################################################
 
-@app.route("/login", methods=['POST'])
-@csrf.exempt
+@app.route("/login", methods=['GET'])
 @swag_from('docs/session/login.yml')
 def login():
     """
@@ -145,7 +220,7 @@ def login():
 
     return redirect(f"https://identity.ua.pt/oauth/authorize?oauth_token={session['_rt'][0]}&oauth_token_secret={session['_rt'][0]}", 302)
 
-@app.route("/auth_callback")
+@app.route("/auth_callback", methods=['GET'])
 @swag_from('docs/session/auth_callback.yml')
 def auth_callback():
     '''
@@ -185,45 +260,50 @@ def auth_callback():
         return Response("""OAuth Error. Please contact an administrator.<br>
                         Server returned: <b>OAuth Server error</b>""", status=500)
 
-    oauth_data = OAuth1(ck,
-                        client_secret=cs,
-                        resource_owner_key=at,
-                        resource_owner_secret=ats,
-                        signature_method=OAUTH_SIGNATURE,
-                        nonce=str(random.getrandbits(64)),
-                        timestamp=str(int(time.time())),
-                        )
+    # cache attributes
+    uu = _get_attr('uu', at, ats)
+    name = _get_attr('name', at, ats)
+    _get_attr('student_info', at, ats)
+    _get_attr('student_courses', at, ats)
+    _get_attr('student_schedule', at, ats)
+    _get_attr('teacher_schedule', at, ats)
+    _get_attr('teacher_courses', at, ats)
 
-    resp = requests.get("https://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : 'uu'})
+    session['uuid'] = uu['iupi']
+    session['user'] = uu['email']
+    session['fname'] = name['name']
+    session['lname'] = name['surname']
 
-    print(resp.content.decode())
-    attrs = resp.content.decode().split("@ua.pt")
-    uemail = attrs[0].split('<email>')[1]
-    uuid = attrs[1]
+    session_cache.set(uu['iupi'], at)
+    session_cache.set(at, ats)
+    
+    session['ts'] = int(time.time())
 
-    session['uuid'] = uuid
-    session['user'] = uemail
-    session['token'] = at
-    session['secret'] = ats
+    # add user if it doesn't exist.
+    if (not pgdb.hasUser(uu['iupi'])):
+        pgdb.addUser(uu['iupi'], uu['email'], False)
 
-    # add user if it doesn't exist. If it does,
-    if (influxdb.has_user(uuid)):
-        pass
-    else:
-        influxdb.add_user(uuid, uemail)
+    return Response(json.dumps({**uu, **name}), status=200, content_type='application/json')
 
-    return Response("LOGIN OK", status=200)
-
-@app.route("/logout", methods=['POST'])
-@csrf.exempt
+@app.route("/logout", methods=['GET'])
 @swag_from('docs/session/logout.yml')
 def logout():
     '''
     Logout endpoint
     '''
-    if not session.get('user') or not session.get('uuid') or not session.get('token'):
+    if not session.get('user') or not session.get('uuid') or not session.get('x'):
         Response("Logout bad request. Server returned: <b>You are not logged in.<b>",status=400)
     
+    #clear cache
+    for s in _SUPPORTED_SCOPES:
+        cache.delete_memoized(_get_attr, s, session.get('x'), session.get('y'))
+
+    at = session_cache.get(session.get('uuid'))
+    session_cache.delete(at)
+
+    session_cache.delete(session.get('uuid'))
+
+    #clear session
     session.clear()
     return Response("Logout successful.",status=200)
 
@@ -361,6 +441,7 @@ def sensors_room_id(roomid):
 #---------User data exposure endpoints-----------#
 ##################################################
 
+@admin_only
 @app.route("/users", methods=['GET'])
 @swag_from('docs/users/users.yml')
 def users():
@@ -369,6 +450,12 @@ def users():
     '''
     return jsonify(RESP_501), 501
 
+@app.route("/identity")
+@swag_from('docs/users/identity.yml')
+def get_username():
+    return _get_attr('card', session.get('at'), session.get('ats'))
+
+@admin_only
 @app.route("/user/<internalid>", methods=['POST'])
 @swag_from('docs/users/user.yml')
 def user_policy(internalid):
@@ -564,6 +651,9 @@ if __name__ == "__main__":
 
         csrf.init_app(app)
         paranoid.init_app(app)
+        cache.init_app(app)
+        session_cache.init_app(app)
+
         app.run(host='0.0.0.0', port=443, ssl_context=('cert.pem', 'key.pem'))
 
     except KeyboardInterrupt:
