@@ -177,7 +177,7 @@ def before_req_f():
                     return redirect(url_for(request.referer))
                 else:
                     return redirect(url_for('.index'))
-    elif request.path != "/spec" and "grafana" not in request.path:
+    elif request.path != "/spec" and "grafana" not in request.path and "auth_callback" not in request.path:
         if not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
             return redirect(url_for('.login'), code=307)
 
