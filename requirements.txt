@@ -4,6 +4,7 @@ chardet==3.0.4
 click==7.1.1
 flasgger==0.9.4
 Flask==1.1.1
+flask_caching==1.8.0
 Flask-Cors==3.0.8
 Flask-Paranoid==0.2.0
 flask-swagger-ui==3.25.0
@@ -33,4 +34,5 @@ urllib3==1.24.3
 vakt==1.4.0
 Werkzeug==1.0.0
 WTForms==2.2.1
+xmltodict==0.12.0
 zipp==3.1.0
