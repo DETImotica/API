@@ -72,6 +72,6 @@ class DataDB(object):
                                )
         result = []
         for p in res.get_points():
-            res.append({"time": p['time'], "value": p['value']})    
+            result.append({"time": p['time'], "value": p['value']})    
         influx_conn.close()
         return json.dumps({"values": result})
