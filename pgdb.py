@@ -67,6 +67,19 @@ class PGDB(object):
         db_con.close()
         return result
 
+    def getSensorsFullDescriptionFromRoom(self, roomid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Sensor.ID, Sensor.Descricao, Nome_TipoSensor, Simbolo FROM Espaco JOIN Sensor ON Espaco.ID=Sensor.ID_Espaco WHERE Espaco.ID = %s", (str(roomid),))
+        tuplos = cursor.fetchall()
+        result = []
+
+        for t in tuplos:
+            result.append({"id" : t[0], "description": t[1], "data" : {"type" : t[2], "unit_symbol" : t[3]}})
+
+        db_con.close()
+        return result
+
     def updateSensorsFromRoom(self, roomid, changes):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()

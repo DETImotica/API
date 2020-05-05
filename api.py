@@ -437,6 +437,17 @@ def sensors_room_id(roomid):
             pgdb.updateSensorsFromRoom(roomid, details)
             return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
 
+
+@app.route("/room/<roomid>/sensors/full", methods=['GET'])
+##@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
+def sensors_room_id_fullversion(roomid):
+    if pgdb.roomExists(roomid):
+        # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
+        r = pgdb.getSensorsFullDescriptionFromRoom(roomid)  ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
+        # TODO verificar quais sensores o user tem acesso
+        return Response(json.dumps(r), status=200, mimetype='application/json')
+    return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+
 ##################################################
 #---------User data exposure endpoints-----------#
 ##################################################
