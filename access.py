@@ -128,7 +128,7 @@ class PolicyManager(ABAC):
 
             # load JSON body
             try:
-                req_json = json.loads(req.data)
+                req_json = req.json
             except:
                 return False, "ERROR: malformed JSON - syntax error"
             
@@ -237,7 +237,7 @@ class PDP(ABAC):
     def __repr__(self):
         return self.__str__()
 
-    def get_http_req_access(self, req, subject_data):
+    def get_http_req_access(self, req, subject_data, opt_resource=None):
         """
         Transforms an HTTP request (req) and retrieves subject data in a PDP request.
         Evaluates if the user/subject given has access given its current attributes.
@@ -249,15 +249,34 @@ class PDP(ABAC):
         resource_path = req.path.split("/")
 
         resource = {}
-        if 'sensor' in resource_path:
-            resource.update({resource_path[0]: resource_path[1]})
-        if 'measure' in resource_path:
-            resource.update({})
-
+        if resource_path[1] in ['rooms', 'types', 'sensor', 'newroom']:
+            if opt_resource:
+                resource.update(opt_resource)
+            else:
+                return False
+        if resource_path[1] == 'room':
+            resource.update({resource_path[1]: resource_path[2]})
+        elif resource_path[1] == 'sensor':
+            if len(resource_path) < 3:
+                if opt_resource:
+                    resource.update(opt_resource)
+                else:
+                    return False
+            else:
+                resource.update({resource_path[1]: resource_path[2]})
+                details = self._pgdb.getSensor(resource_path[2])
+                resource.update({'type': details['data']['type']})
+            
+            if len(resource_path) > 3 and resource_path[3] == 'measure':
+                resource.update({resource_path[3]: resource_path[4]})
+            
+        current_date = arrow.utcnow()
+        time = current_date.strftime("%H:%M:%S")
+        day = current_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         inq = Inquiry(subject=subject_data,
                       action=req.method,
-                      resource={resource[0]: resource[1], resource[2]: resource[3]},
-                      context={'ip': req.remote_addr}
+                      resource=resource,
+                      context={'ip': req.remote_addr, 'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
                     )
 
         g = Guard(self._storage, RulesChecker())

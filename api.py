@@ -28,6 +28,7 @@ from flask_wtf.csrf import CSRFProtect
 from hashlib import sha3_256
 from requests_oauthlib import OAuth1
 
+from access import PDP, PolicyManager
 from datadb import DataDB
 from pgdb import PGDB
 
@@ -89,6 +90,9 @@ session_cache = Cache(app, config={'CACHE_DIR': ".app_session_cache/",
                                   })
 
 swagger = Swagger(app)
+
+_pdp = PDP()
+_access_mgr = PolicyManager()
 
 # OAuth global vars
 OAUTH_SIGNATURE = 'HMAC-SHA1'
@@ -155,21 +159,32 @@ def _validate_token(uuid, email):
 
     return uu is not None and uuid == uu['iupi'] and email == uu['email']
 
-# Make sure user is logged in to access user data
+# return a dict with all user attributes.
+def _get_user_attrs(s):
+    at = session_cache.get(s.get('uuid'))
+    ats = session_cache.get(at)
+
+    return {**_get_attr('uu', at, ats),
+                    **_get_attr('name', at, ats),
+                    **_get_attr('student_info', at, ats),
+                    **_get_attr('student_courses', at, ats),
+                    **_get_attr('teacher_courses', at, ats)
+           }
+
+# Admin only endpoint decorator
 def admin_only(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        res = session.get('uuid')
-        if not res:
-            abort(401)
-        if not pgdb.isAdmin(res):
-            abort(403)
+        id = session.get('uuid')
+        if not id:
+            return Response(json.dumps({"error_description": f"You are not logged in."}), status=401, mimetype='application/json')
+        if not pgdb.isAdmin(id):
+            return Response(json.dumps({"error_description": f"Access denied: admin only endpoint."}), status=401, mimetype='application/json')
         return f(*args, **kwargs)
     return wrapper
 
 @app.before_request
 def before_req_f():
-    print(request.path)
     if request.path == "/login":
         if session.get('user') and session.get('uuid'):
             if _validate_token(session.get('uuid'), session.get('user')):
@@ -177,9 +192,9 @@ def before_req_f():
                     return redirect(url_for(request.referer))
                 else:
                     return redirect(url_for('.index'))
-    # elif request.path != "/spec" and "grafana" not in request.path and "auth_callback" not in request.path:
-    #     if not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
-    #         return redirect(url_for('.login'), code=307)
+    elif request.path != "/spec" and "grafana" not in request.path and "auth_callback" not in request.path:
+        if not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
+            return redirect(url_for('.login'), code=307)
 
 @app.route("/", methods=['GET', 'HEAD'])
 def index():
@@ -210,8 +225,11 @@ def login():
     resp = requests.post("https://identity.ua.pt/oauth/request_token", auth=oauth_p1)
 
     if resp.status_code != 200:
-        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",
-                        status=resp.status_code
+        return Response(json.dumps({
+                         "error_description": f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b><br>Please contact an administrator."
+                        }),
+                        status=resp.status_code,
+                        content_type="application/json"
                         )
 
     resp_json = parse_qs(resp.content.decode("utf-8"))
@@ -231,10 +249,14 @@ def auth_callback():
     ot = request.args.get('oauth_token')
 
     if not ov or not ot:
-        return Response("OAuth error.<br>Server returned: <b>Invalid request.</b>", status=400)
+        return Response(json.dumps({"error_descrption": "OAuth error.<br>Server returned: <b>Invalid request.</b>"}),
+                        status=400,
+                        mimetype="application/json")
 
     if request.args.get('consent'):
-        return Response("OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>", status=401)
+        return Response(json.dumps({"error_description": "OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>"}),
+                        status=401,
+                        mimetype="application/json")
 
     rt = session.pop('_rt')
     oauth_access =  OAuth1(ck,
@@ -251,14 +273,18 @@ def auth_callback():
     resp_json = parse_qs(resp.content.decode("utf-8"))
 
     if not resp_json:
-        return Response(f"Error.\nServer returned: <b>{resp.content.decode()}</b>", status=resp.status_code)
+        return Response(json.dumps({"error_description": f"OAuth Error.<br>Server returned: <b>{resp.content.decode()}</b>"}),
+                        status=resp.status_code,
+                        mimetype="application/json")
 
     try:
         at = resp_json['oauth_token'][0]
         ats = resp_json['oauth_token_secret'][0]
     except KeyError:
-        return Response("""OAuth Error. Please contact an administrator.<br>
-                        Server returned: <b>OAuth Server error</b>""", status=500)
+        return Response(json.dumps({'error_description': """OAuth Error. Please contact an administrator.<br>
+                        Server returned: <b>OAuth Server error</b>"""}),
+                        status=500, 
+                        mimetype="application/json")
 
     # cache attributes
     uu = _get_attr('uu', at, ats)
@@ -283,7 +309,7 @@ def auth_callback():
     if (not pgdb.hasUser(uu['iupi'])):
         pgdb.addUser(uu['iupi'], uu['email'], False)
 
-    return Response(json.dumps({**uu, **name}), status=200, content_type='application/json')
+    return Response(json.dumps({**uu, **name}), status=200, mimetype='application/json')
 
 @app.route("/logout", methods=['GET'])
 @swag_from('docs/session/logout.yml')
@@ -292,7 +318,9 @@ def logout():
     Logout endpoint
     '''
     if not session.get('user') or not session.get('uuid') or not session.get('x'):
-        Response("Logout bad request. Server returned: <b>You are not logged in.<b>",status=400)
+        Response({"error_description": "Bad request. Server returned: <b>You are not logged in.<b>"},
+                    status=400,
+                    content_type="application/json")
     
     #clear cache
     for s in _SUPPORTED_SCOPES:
@@ -319,10 +347,20 @@ def rooms():
     todo
     '''
     dic = {}
-    dic.update(ids = pgdb.getRooms())
+    
+    user_attrs = _get_user_attrs(session)
+                 
+    rooms = []
+    for r in pgdb.getRooms():
+        if _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': r}):
+            rooms.append(r)
+    
+    dic.update(ids = rooms)
+
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 
+@admin_only
 @app.route("/room", methods=['POST'])
 @swag_from('docs/rooms/room.yml')
 def newroom():
@@ -371,6 +409,9 @@ def room_id(roomid):
     todo
     '''
     if request.method == 'GET':
+        user_attrs = _get_user_attrs(session)
+        if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
+            return Response(json.dumps({"error_description": f"Access denied to room {roomid}. Talk to an administrator"}), status=401, mimetype='application/json')
         if pgdb.roomExists(roomid):
             #TODO podemos depois aquilo restringir com as politicas as info das salas
             return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
@@ -378,6 +419,9 @@ def room_id(roomid):
 
 
     if request.method == 'POST':
+        if not pgdb.isAdmin(session.get('uuid')):
+            return Response(json.dumps({"error_description": f"You have to be an administrator to do that."}), status=403, mimetype='application/json')
+
         new_details = request.json #{name: "", description: ""}"
         if ("name" in new_details and (new_details["name"])>50):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
@@ -401,12 +445,16 @@ def sensors_room_id(roomid):
     '''
     todo
     '''
-
-    if request.method == 'GET':
+    user_attrs = _get_user_attrs(session)
+    if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
+        return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
+    
+    if request.method == 'GET': 
         if pgdb.roomExists(roomid):
             # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
             dic = {}
-            dic.update(ids = pgdb.getSensorsFromRoom(roomid))
+            sensors = [s for s in pgdb.getSensorsFromRoom(roomid) if _pdp.get_http_req_access(request, user_attrs, opt_resource={'sensor': s})]
+            dic.update(ids = sensors)
             # TODO verificar quais sensores o user tem acesso
             return Response(json.dumps(dic), status=200, mimetype='application/json')
         return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=404, mimetype='application/json')
@@ -450,10 +498,20 @@ def users():
     '''
     return jsonify(RESP_501), 501
 
-@app.route("/identity")
-@swag_from('docs/users/identity.yml')
-def get_username():
-    return _get_attr('card', session.get('at'), session.get('ats'))
+@app.route("/identity", methods=['GET'])
+def identity():
+    '''
+    Get user session information
+    '''
+    at = session_cache.get(session.get('uuid'))
+    ats = session_cache.get(at)
+
+    return Response(json.dumps({**_get_attr('uu', at, ats),
+            **_get_attr('name', at, ats),
+            **_get_attr('student_info', at, ats),
+            **_get_attr('student_courses', at, ats),
+            **_get_attr('teacher_courses', at, ats)
+    }), status=200, content_type='application/json')
 
 @admin_only
 @app.route("/user/<internalid>", methods=['POST'])
@@ -464,6 +522,17 @@ def user_policy(internalid):
     '''
     return jsonify(RESP_501), 501
 
+@admin_only
+@app.route("/add_admin", methods=['POST'])
+def add_admin():
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+    if 'user' in request.json:
+        pgdb.updateUserAdminStatus(request.json['user'])
+    else:
+        return Response(json.dumps({"error_description": "No 'user' specified for the action."}), status=400,mimetype='application/json')
+    return Response(json.dumps({"status": "OK"}), status=200,mimetype='application/json')
 
 ##################################################
 #---------Sensor data exposure endpoints---------#
@@ -475,8 +544,10 @@ def sensors():
     '''
     Get the sensors_id for a user from the database --> getAllowedSensors(bd, user_email)
     '''
+    user_attrs = _get_user_attrs(session)
+
     s_list = pgdb.getAllSensors()
-    d = {"ids" : [tuplo[0] for tuplo in s_list]} #{"ids" : [uuid1, uuid2]}
+    d = {"ids" : [tuplo[0] for tuplo in s_list if _pdp.get_http_req_access(request, user_attrs, {'sensor' : tuplo[0]})]} #{"ids" : [uuid1, uuid2]}
     # TODO Aplicar politicas para saber quais são os Sensores que o User tem acesso
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
@@ -487,11 +558,11 @@ def types():
     '''
     Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)
     '''
-    t_list = pgdb.getAllSensorTypes()
-    d = {"types" : [tuplo[0] for tuplo in t_list]} # {"types" : ["Temperatura", "Humidade", "Som"]}
+    user_attrs = _get_user_attrs(session)
+
+    d = {"types" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : tuplo[0]})]} # {"types" : ["Temperatura", "Humidade", "Som"]}
     #TODO Aplicar politicas para saber quais são os tipos que o User pode ter conhecimento
     return Response(json.dumps(d), status=200, mimetype='application/json')
-
 
 @app.route("/sensor", methods=['POST'])
 @swag_from('docs/sensors/sensor.yml')
@@ -500,9 +571,9 @@ def new_sensor():
     '''
     todo
     '''
+
     id = uuid.uuid4()
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
-    #TODO Veficar se a pessoa é um admin
 
     if "description" not in details or "data" not in details:
         return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
@@ -521,11 +592,18 @@ def new_sensor():
 
     if not pgdb.datatypeExists(details["data"]["type"]):
         return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
+    
+    user_attrs = _get_user_attrs(session)
+    if not _pdp.get_http_req_access(request, user_attrs, {'sensor' : id}):
+        return Response(json.dumps({"error description": f"Access denied: you can't add a new sensor."}), status=401, mimetype='application/json')
 
     if "room_id" in details:
         if not pgdb.roomExists(details["room_id"]):
             return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
-
+    
+    if not _pdp.get_http_req_access(request, user_attrs, {'room' : details['room_id']}):
+        return Response(json.dumps({"error description": f"Access denied: you can't add a new sensor to room {details['room_id']}."}), status=401, mimetype='application/json')
+        
     # url = "http://iot.av.it.pt/device/standalone"
     # data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
     # response = requests.post(url, headers={"Content-Type": "application/json"}, auth=("detimotic", "<pass>"), data=json.dumps(data_influx))
@@ -544,6 +622,9 @@ def sensor_description(sensorid):
     '''
     todo
     '''
+    if _pdp.get_http_req_access(request, _get_user_attrs(session)):
+        return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
+    
     if request.method == 'GET':
         # TODO verificar quais sensores o user tem acesso
         try:
@@ -593,8 +674,8 @@ def sensor_description(sensorid):
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
 @swag_from('docs/sensors/sensor_measure.yml')
 def sensor_measure(sensorid, option):
-    #TODO Verificar se o User tem acesso ao sensor
-    '''Verify if the sensor supports a "measure" from database getTypeFromSensor()'''
+    if _pdp.get_http_req_access(request, _get_user_attrs(session)):
+        return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
 
     try:
         pgdb.isSensorFree(sensorid)

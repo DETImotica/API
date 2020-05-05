@@ -45,7 +45,7 @@ class PGDB(object):
             cursor.execute("UPDATE Espaco SET Nome = %s WHERE ID = %s;", (new_details["name"], roomid))
         if "description" in new_details:
             cursor.execute("UPDATE Espaco SET Descricao = %s WHERE ID = %s;", (new_details["description"], roomid))
-
+        db_con.commit()
         db_con.close()
 
 
@@ -55,6 +55,7 @@ class PGDB(object):
         cursor.execute("INSERT INTO Espaco VALUES (%s, %s, %s);", (str(roomid), roomdata["name"], roomdata["description"]))
         for s in sensors:
             cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (str(roomid), s))
+        db_con.commit()
         db_con.close()
 
 
@@ -75,7 +76,8 @@ class PGDB(object):
 
         for s in changes["remove"]:
             cursor.execute("UPDATE Sensor SET ID_Espaco = Null WHERE ID = %s;", (str(roomid), s))
-
+        
+        db_con.commit()
         db_con.close()
 
     def getSensor(self, sensorid):
@@ -95,6 +97,8 @@ class PGDB(object):
         cursor = db_con.cursor()
         if "room_id" in sensordata:
             cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
+        
+        db_con.commit()
         db_con.close()
 
 
@@ -107,6 +111,8 @@ class PGDB(object):
             cursor.execute("UPDATE Sensor SET Nome_TipoSensor = %s WHERE ID = %s;", (sensordata["data"]["type"], sensorid))
         if "data" in sensordata and "unit_symbol" in sensordata["data"]:
             cursor.execute("UPDATE Sensor SET Simbolo = %s WHERE ID = %s;", (sensordata["data"]["unit_symbol"], sensorid))
+        
+        db_con.commit()
         db_con.close()
 
     def isSensorFree(self, sensorid):
@@ -177,16 +183,39 @@ class PGDB(object):
         db_con.close()
         return res
 
-    def addUser(self, id, email, admin=False):
-        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
-        cursor = db_con.cursor()
-        cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s, %s);", (str(id), str(email), str(admin), 'null'))
-        db_con.close()
-        return True
-
     def hasUser(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),))
         db_con.close()
         return False
+
+    def addUser(self, id, email, admin=False, politica=None):
+        if not (id and email and admin):
+            return False
+
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+
+        cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s, %s);", (str(id), str(email), str(admin), 'null'))
+        db_con.commit()
+        db_con.close()
+        return True
+
+    def addAdmin(self, email):
+        if not email:
+            return False
+
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("UPDATE Utilizador SET admin = true WHERE email = %s;", (str(email),))
+        db_con.commit()
+        db_con.close()
+        return True
+
+    def updateUserAdminStatus(self, email, admin=False):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("UPDATE Utilizador SET admin = %s WHERE email = %s;", (str(admin), str(email)))
+        db_con.commit()
+        db_con.close()
