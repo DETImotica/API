@@ -57,6 +57,12 @@ class PGDB(object):
             cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (str(roomid), s))
         db_con.close()
 
+    def deleteRoom(self, roomid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("DELETE FROM Espaco WHERE Espaco.ID = %s;", (str(roomid),))
+        db_con.close()
+
 
 
     def getSensorsFromRoom(self, roomid):
@@ -108,6 +114,12 @@ class PGDB(object):
         cursor = db_con.cursor()
         if "room_id" in sensordata:
             cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
+        db_con.close()
+
+    def deleteSensor(self, sensorid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("DELETE FROM Sensor WHERE Sensor.ID = %s;", (sensorid,))
         db_con.close()
 
 

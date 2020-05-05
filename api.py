@@ -370,11 +370,12 @@ def room_id(roomid):
     '''
     todo
     '''
-    if request.method == 'GET':
-        if pgdb.roomExists(roomid):
-            #TODO podemos depois aquilo restringir com as politicas as info das salas
-            return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
+    if not pgdb.roomExists(roomid):
         return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+
+    if request.method == 'GET':
+        #TODO podemos depois aquilo restringir com as politicas as info das salas
+        return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
 
 
     if request.method == 'POST':
@@ -384,14 +385,20 @@ def room_id(roomid):
         if ("description" in new_details and (new_details["description"]>50)):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-        if pgdb.roomExists(roomid):
-            # TODO podemos depois aquilo restringir com as politicas as info das salas
-            pgdb.updateRoom(roomid, new_details)
-            return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+        #TODO podemos depois aquilo restringir com as politicas as info das salas
+        pgdb.updateRoom(roomid, new_details)
+        return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
 
-    #TODO remover salas
+    if request.method == 'DELETE':
+        #TODO podemos depois aquilo restringir com as politicas as info das salas
+        pgdb.deleteRoom(roomid, new_details)
+        return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
+
+
     return jsonify(RESP_501), 501
+
+
+
 
 
 @app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
@@ -597,7 +604,15 @@ def sensor_description(sensorid):
         pgdb.updateSensor(sensorid, details)
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
 
-    #TODO falta remover sensores
+    if request.method == 'DELETE':
+        # TODO verificar quais sensores o user tem acesso
+        try:
+            pgdb.isSensorFree(sensorid)
+            pgdb.deleteSensor(sensorid)
+            return Response(json.dumps({"id": sensorid}), status=200, mimetype='application/json')
+        except:
+            return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=404, mimetype='application/json')
+
     return jsonify(RESP_501), 501
 
 
