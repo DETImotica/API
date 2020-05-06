@@ -178,6 +178,9 @@ class PGDB(object):
         db_con.close()
         return True
 
+    
+        
+
     def isAdmin(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -193,6 +196,8 @@ class PGDB(object):
         res = cursor.fetchall()
         db_con.close()
         return res
+
+
 
     def getAllSensors(self):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
@@ -215,3 +220,54 @@ class PGDB(object):
         cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),))
         db_con.close()
         return False
+
+
+    def createSensorType(self, details):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("INSERT INTO TipoSensor VALUES (%s, %s);", (details["name"], details["description"]))
+        db_con.close()
+
+
+    def getSensorType(self, name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        ##TODO verificar se esta query funciona como esperado
+        cursor.execute("SELECT Descricao, Distinct Simbolo FROM TipoSensor JOIN Sensor ON TipoSensor.Nome = Nome_TipoSensor WHERE TipoSensor.Nome = %s;", (str(name),))
+        
+        l_tuplos = cursor.fetchall()
+        l_simbolos = [t[1] for t in l_tuplos]
+        description = l_tuplos[0][0]
+
+        db_con.close()
+        return {"description" : description, "units" : l_simbolos}
+
+
+    def updateSensorType(self, name, new_details):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        if "description" in new_details:
+            cursor.execute("UPDATE TipoSensor SET Descricao = %s WHERE Nome = %s;", (new_details["description"], str(name))
+
+        db_con.close()
+
+
+    def deleteSensorType(self, name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("DELETE FROM TipoSensor WHERE Nome = %s;", (str(name),))
+        sb_con.close()
+
+
+    def getSensorsFromType(self, type_name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Sensor.id FROM TipoSensor JOIN Sensor ON Nome_TipoSensor = TipoSensor.Nome WHERE TipoSensor.Nome = %s;", (str(type_name),))
+        l_tuplos = cursor.fetchall()
+        db_con.close()
+
+        if l_tuplos == None :
+            return []
+        return [t[0] for t in l_tuplos]
+
+        

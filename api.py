@@ -498,19 +498,6 @@ def sensors():
     # TODO Aplicar politicas para saber quais são os Sensores que o User tem acesso
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
-
-@app.route("/types", methods=['GET'])
-@swag_from('docs/sensors/types.yml')
-def types():
-    '''
-    Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)
-    '''
-    t_list = pgdb.getAllSensorTypes()
-    d = {"types" : [tuplo[0] for tuplo in t_list]} # {"types" : ["Temperatura", "Humidade", "Som"]}
-    #TODO Aplicar politicas para saber quais são os tipos que o User pode ter conhecimento
-    return Response(json.dumps(d), status=200, mimetype='application/json')
-
-
 @app.route("/sensor", methods=['POST'])
 @swag_from('docs/sensors/sensor.yml')
 @csrf.exempt
@@ -663,8 +650,65 @@ def sensor_event(sensorid, option):
     # get data from influx
     return jsonify(RESP_501), 501
 
+
+
 ####################################################
+##              Type Data Methods                 ##
 ####################################################
+
+
+@app.route("/type", methods=['POST'])
+##@swag_from('docs/sensors/types.yml')
+def new_type():
+    details = request.json  # {"name" : "" ,"description" : ""}
+    # TODO Veficar se a pessoa é um admin
+
+    if "description" not in details or "name" not in details:
+        return Response(json.dumps({"error_description": "New Data Type Details Incomplete"}), status=400, mimetype='application/json')
+
+    if len(details["description"]) > 50 or len(details["name"]) > 50:
+        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+    if pgdb.datatypeExists(details["name"]) :
+        return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
+
+    pgdb.createSensorType(details)
+    return Response(json.dumps({"name": details["name"]}), status=200, mimetype='application/json')
+
+@app.route("/type/<typename>", methods=['GET', 'POST', 'DELETE'])
+##@swag_from('docs/sensors/types.yml')
+def typesFromName(typename):
+    
+    if not pddb.datatypeExists(typename):
+        return Response(json.dumps({"error_description": "The name type sent does not exist"}), status=400, mimetype='application/json')
+
+    if request.method == 'GET':
+        #TODO verificar se o utilizador tem permissao para esta ação
+
+        return Response(json.dumps(pgdb.getSensorType(typename)), status=200, mimetype='application/json')
+
+    if request.method == 'POST':
+        #TODO verificar se o utilizador tem permissao para esta ação
+
+        details = request.json #{"description" : ""}
+
+        if ("description" in details) and len(details["description"] > 50):
+            return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+        pgdb.updateSensorType(typename, details)
+        return Response(json.dumps({"name" : typename}), status=200, mimetype='application/json')
+
+    if request.method == 'DELETE':
+        #TODO verificar se o utilizador tem permissao para esta ação
+        if pgdb.getSensorsFromType(typename) != []:
+            return Response(json.dumps({"error_description" : "Cannot remove a sensor type that has at least one sensor"}, status=400, mimetype='application/json'))
+
+        pgdb.deleteSensorType(typename)
+        return Response(json.dumps({"name" : typename}, status=200, mimetype='application/json'))
+        
+
+
+
 
 # run self-signed and self-managed PKI instead of self-signed certificate
 # (or a real cert?)
