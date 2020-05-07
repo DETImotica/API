@@ -339,6 +339,7 @@ def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
+    #TODO FAZER QUE A DESCRICAO FIQUE OPCIONAL
     if "name" not in details or "description" not in details:
         return Response(json.dumps({"error_description" : "Room details incomplete"}), status=400, mimetype='application/json')
 
@@ -509,10 +510,10 @@ def new_sensor():
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
     #TODO Veficar se a pessoa é um admin
 
-    if "description" not in details or "data" not in details:
+     if "data" not in details:
         return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
 
-    if len(details["description"])>50:
+    if "description" in details and len(details["description"])>50:
         return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400,mimetype='application/json')
 
     if "type" not in details["data"] or "unit_symbol" not in details["data"]:
