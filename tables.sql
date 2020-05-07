@@ -24,8 +24,8 @@ CREATE TABLE Sensor (
 	Simbolo varchar(3) not null,			--EX ºC
 	ID_Espaco UUID,
 	PRIMARY KEY (ID),
-	FOREIGN KEY (ID_Espaco) REFERENCES Espaco(ID),
-	FOREIGN KEY (Nome_TipoSensor) REFERENCES TipoSensor(Nome)
+	FOREIGN KEY (ID_Espaco) REFERENCES Espaco(ID) ON DELETE SET NULL,
+	FOREIGN KEY (Nome_TipoSensor) REFERENCES TipoSensor(Nome) ON UPDATE CASCADE
 );
 
 

@@ -377,6 +377,7 @@ def newroom():
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
+    #TODO FAZER QUE A DESCRICAO FIQUE OPCIONAL
     if "name" not in details or "description" not in details:
         return Response(json.dumps({"error_description" : "Room details incomplete"}), status=400, mimetype='application/json')
 
@@ -408,14 +409,16 @@ def room_id(roomid):
     '''
     todo
     '''
+    if not pgdb.roomExists(roomid):
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+
     if request.method == 'GET':
+        #TODO podemos depois aquilo restringir com as politicas as info das salas
         user_attrs = _get_user_attrs(session)
         if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
             return Response(json.dumps({"error_description": f"Access denied to room {roomid}. Talk to an administrator"}), status=401, mimetype='application/json')
-        if pgdb.roomExists(roomid):
-            #TODO podemos depois aquilo restringir com as politicas as info das salas
-            return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+
+        return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
 
 
     if request.method == 'POST':
@@ -428,14 +431,20 @@ def room_id(roomid):
         if ("description" in new_details and (new_details["description"]>50)):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-        if pgdb.roomExists(roomid):
-            # TODO podemos depois aquilo restringir com as politicas as info das salas
-            pgdb.updateRoom(roomid, new_details)
-            return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+        #TODO podemos depois aquilo restringir com as politicas as info das salas
+        pgdb.updateRoom(roomid, new_details)
+        return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
 
-    #TODO remover salas
+    if request.method == 'DELETE':
+        #TODO podemos depois aquilo restringir com as politicas as info das salas
+        pgdb.deleteRoom(roomid, new_details)
+        return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
+
+
     return jsonify(RESP_501), 501
+
+
+
 
 
 @app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
@@ -484,6 +493,17 @@ def sensors_room_id(roomid):
 
             pgdb.updateSensorsFromRoom(roomid, details)
             return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
+
+
+@app.route("/room/<roomid>/sensors/full", methods=['GET'])
+##@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
+def sensors_room_id_fullversion(roomid):
+    if pgdb.roomExists(roomid):
+        # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
+        r = pgdb.getSensorsFullDescriptionFromRoom(roomid)  ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
+        # TODO verificar quais sensores o user tem acesso
+        return Response(json.dumps(r), status=200, mimetype='application/json')
+    return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
 ##################################################
 #---------User data exposure endpoints-----------#
@@ -551,7 +571,6 @@ def sensors():
     # TODO Aplicar politicas para saber quais são os Sensores que o User tem acesso
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
-
 @app.route("/types", methods=['GET'])
 @swag_from('docs/sensors/types.yml')
 def types():
@@ -575,10 +594,10 @@ def new_sensor():
     id = uuid.uuid4()
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
 
-    if "description" not in details or "data" not in details:
+     if "data" not in details:
         return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
 
-    if len(details["description"])>50:
+    if "description" in details and len(details["description"])>50:
         return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400,mimetype='application/json')
 
     if "type" not in details["data"] or "unit_symbol" not in details["data"]:
@@ -667,7 +686,15 @@ def sensor_description(sensorid):
         pgdb.updateSensor(sensorid, details)
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
 
-    #TODO falta remover sensores
+    if request.method == 'DELETE':
+        # TODO verificar quais sensores o user tem acesso
+        try:
+            pgdb.isSensorFree(sensorid)
+            pgdb.deleteSensor(sensorid)
+            return Response(json.dumps({"id": sensorid}), status=200, mimetype='application/json')
+        except:
+            return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=404, mimetype='application/json')
+
     return jsonify(RESP_501), 501
 
 
@@ -718,8 +745,65 @@ def sensor_event(sensorid, option):
     # get data from influx
     return jsonify(RESP_501), 501
 
+
+
 ####################################################
+##              Type Data Methods                 ##
 ####################################################
+
+
+@app.route("/type", methods=['POST'])
+##@swag_from('docs/sensors/types.yml')
+def new_type():
+    details = request.json  # {"name" : "" ,"description" : ""}
+    # TODO Veficar se a pessoa é um admin
+
+    if "description" not in details or "name" not in details:
+        return Response(json.dumps({"error_description": "New Data Type Details Incomplete"}), status=400, mimetype='application/json')
+
+    if len(details["description"]) > 50 or len(details["name"]) > 50:
+        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+    if pgdb.datatypeExists(details["name"]) :
+        return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
+
+    pgdb.createSensorType(details)
+    return Response(json.dumps({"name": details["name"]}), status=200, mimetype='application/json')
+
+@app.route("/type/<typename>", methods=['GET', 'POST', 'DELETE'])
+##@swag_from('docs/sensors/types.yml')
+def typesFromName(typename):
+    
+    if not pddb.datatypeExists(typename):
+        return Response(json.dumps({"error_description": "The name type sent does not exist"}), status=400, mimetype='application/json')
+
+    if request.method == 'GET':
+        #TODO verificar se o utilizador tem permissao para esta ação
+
+        return Response(json.dumps(pgdb.getSensorType(typename)), status=200, mimetype='application/json')
+
+    if request.method == 'POST':
+        #TODO verificar se o utilizador tem permissao para esta ação
+
+        details = request.json #{"description" : ""}
+
+        if ("description" in details) and len(details["description"] > 50):
+            return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+        pgdb.updateSensorType(typename, details)
+        return Response(json.dumps({"name" : typename}), status=200, mimetype='application/json')
+
+    if request.method == 'DELETE':
+        #TODO verificar se o utilizador tem permissao para esta ação
+        if pgdb.getSensorsFromType(typename) != []:
+            return Response(json.dumps({"error_description" : "Cannot remove a sensor type that has at least one sensor"}, status=400, mimetype='application/json'))
+
+        pgdb.deleteSensorType(typename)
+        return Response(json.dumps({"name" : typename}, status=200, mimetype='application/json'))
+        
+
+
+
 
 # run self-signed and self-managed PKI instead of self-signed certificate
 # (or a real cert?)

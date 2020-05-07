@@ -58,6 +58,13 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
 
+    def deleteRoom(self, roomid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("DELETE FROM Espaco WHERE Espaco.ID = %s;", (str(roomid),))
+        db_con.commit()
+        db_con.close()
+
 
 
     def getSensorsFromRoom(self, roomid):
@@ -65,6 +72,19 @@ class PGDB(object):
         cursor = db_con.cursor()
         cursor.execute("SELECT Sensor.ID FROM Espaco JOIN Sensor ON Espaco.ID=Sensor.ID_Espaco WHERE Espaco.ID = %s", (str(roomid),))
         result = [l[0] for l in cursor.fetchall()]
+        db_con.close()
+        return result
+
+    def getSensorsFullDescriptionFromRoom(self, roomid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Sensor.ID, Sensor.Descricao, Nome_TipoSensor, Simbolo FROM Espaco JOIN Sensor ON Espaco.ID=Sensor.ID_Espaco WHERE Espaco.ID = %s", (str(roomid),))
+        tuplos = cursor.fetchall()
+        result = []
+
+        for t in tuplos:
+            result.append({"id" : t[0], "description": t[1], "data" : {"type" : t[2], "unit_symbol" : t[3]}})
+
         db_con.close()
         return result
 
@@ -95,9 +115,20 @@ class PGDB(object):
     def createSensor(self, sensorid, sensordata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        if "room_id" in sensordata:
-            cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
-        
+
+        if "description" not in sensordata:
+            sensordata["description"] = "Null"
+        if "room_id" not in sensordata:
+            sensordata["room_id"] = "Null"
+
+        cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
+        db_con.commit()
+        db_con.close()
+
+    def deleteSensor(self, sensorid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("DELETE FROM Sensor WHERE Sensor.ID = %s;", (sensorid,))
         db_con.commit()
         db_con.close()
 
@@ -111,7 +142,9 @@ class PGDB(object):
             cursor.execute("UPDATE Sensor SET Nome_TipoSensor = %s WHERE ID = %s;", (sensordata["data"]["type"], sensorid))
         if "data" in sensordata and "unit_symbol" in sensordata["data"]:
             cursor.execute("UPDATE Sensor SET Simbolo = %s WHERE ID = %s;", (sensordata["data"]["unit_symbol"], sensorid))
-        
+        if "room_id" in sensordata:
+            cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (sensordata["room_id"], sensorid))
+
         db_con.commit()
         db_con.close()
 
@@ -159,6 +192,9 @@ class PGDB(object):
         db_con.close()
         return True
 
+    
+        
+
     def isAdmin(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -174,6 +210,8 @@ class PGDB(object):
         res = cursor.fetchall()
         db_con.close()
         return res
+
+
 
     def getAllSensors(self):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
@@ -219,3 +257,57 @@ class PGDB(object):
         cursor.execute("UPDATE Utilizador SET admin = %s WHERE email = %s;", (str(admin), str(email)))
         db_con.commit()
         db_con.close()
+        return False
+
+
+    def createSensorType(self, details):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("INSERT INTO TipoSensor VALUES (%s, %s);", (details["name"], details["description"]))
+        db_con.commit()
+        db_con.close()
+
+
+    def getSensorType(self, name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        ##TODO verificar se esta query funciona como esperado
+        cursor.execute("SELECT Descricao, Distinct Simbolo FROM TipoSensor JOIN Sensor ON TipoSensor.Nome = Nome_TipoSensor WHERE TipoSensor.Nome = %s;", (str(name),))
+        
+        l_tuplos = cursor.fetchall()
+        l_simbolos = [t[1] for t in l_tuplos]
+        description = l_tuplos[0][0]
+
+        db_con.close()
+        return {"description" : description, "units" : l_simbolos}
+
+
+    def updateSensorType(self, name, new_details):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        if "description" in new_details:
+            cursor.execute("UPDATE TipoSensor SET Descricao = %s WHERE Nome = %s;", (new_details["description"], str(name))
+
+        db_con.commit()
+        db_con.close()
+
+
+    def deleteSensorType(self, name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("DELETE FROM TipoSensor WHERE Nome = %s;", (str(name),))
+        db_con.commit()
+        sb_con.close()
+
+
+    def getSensorsFromType(self, type_name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Sensor.id FROM TipoSensor JOIN Sensor ON Nome_TipoSensor = TipoSensor.Nome WHERE TipoSensor.Nome = %s;", (str(type_name),))
+        l_tuplos = cursor.fetchall()
+        db_con.close()
+
+        if l_tuplos == None :
+            return []
+        return [t[0] for t in l_tuplos]
+
