@@ -413,7 +413,7 @@ def room_id(roomid):
         return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
     if request.method == 'GET':
-        #TODO podemos depois aquilo restringir com as politicas as info das salas
+        
         user_attrs = _get_user_attrs(session)
         if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
             return Response(json.dumps({"error_description": f"Access denied to room {roomid}. Talk to an administrator"}), status=401, mimetype='application/json')
@@ -800,7 +800,39 @@ def typesFromName(typename):
 
         pgdb.deleteSensorType(typename)
         return Response(json.dumps({"name" : typename}, status=200, mimetype='application/json'))
+
+
+####################################################
+##            Access Control Database             ##
+####################################################
+
+@admin_only
+@app.route("/accessPolicy", methods=['POST'])
+##@swag_from('docs/sensors/types.yml')
+def newAccessPolicy():
+    response = _access_mgr.create_policy(request)
+        if not response[0]:
+            return Response(json.dumps({"error_description" : response[1]}, status=400, mimetype='application/json'))
+        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json')
+
+@admin_only
+@app.route("/accessPolicy/<policy-id>", methods=['POST', 'DELETE'])
+##@swag_from('docs/sensors/types.yml')
+def accessPolicy(policy_id):
+
+    if request.method == 'POST' :
+        response = _access_mgr.update_policy(policy_id)
+        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json')
         
+    if request.method == 'DELETE' :
+        response = _access_mgr.delete_policy(policy_id)
+        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json')
+
+@admin_only
+@app.route("/accessPolicies", methods=['GET'])
+##@swag_from('docs/sensors/types.yml')
+def getAllAccessPolicies():
+    return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')
 
 
 
