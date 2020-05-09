@@ -249,17 +249,17 @@ class PDP(ABAC):
         resource_path = req.path.split("/")
 
         resource = {}
-        if resource_path[1] in ['rooms', 'types', 'sensor', 'newroom']:
+        if resource_path[1] in ['rooms', 'types', 'sensor', 'newroom']: ### newroom nao existe
             if opt_resource:
                 resource.update(opt_resource)
             else:
                 return False
-        if resource_path[1] == 'room':
+        if resource_path[1] == 'room': ### prob mais um if
             resource.update({resource_path[1]: resource_path[2]})
         elif resource_path[1] == 'sensor':
             if len(resource_path) < 3:
                 if opt_resource:
-                    resource.update(opt_resource)
+                    resource.update(opt_resource) ##verficar pois isto ja e feito em cima
                 else:
                     return False
             else:

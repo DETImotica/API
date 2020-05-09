@@ -641,7 +641,7 @@ def new_sensor():
     id = uuid.uuid4()
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
 
-     if "data" not in details:
+    if "data" not in details:
         return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
 
     if "description" in details and len(details["description"])>50:
@@ -885,25 +885,23 @@ def typesFromName_admin(typename):
 
 @admin_only
 @app.route("/accessPolicy", methods=['POST'])
-##@swag_from('docs/sensors/types.yml')
 def newAccessPolicy():
     response = _access_mgr.create_policy(request)
-        if not response[0]:
-            return Response(json.dumps({"error_description" : response[1]}, status=400, mimetype='application/json'))
-        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json')
+    if not response[0]:
+        return Response(json.dumps({"error_description" : response[1]}, status=400, mimetype='application/json'))
+    return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
 
 @admin_only
 @app.route("/accessPolicy/<policy-id>", methods=['POST', 'DELETE'])
 ##@swag_from('docs/sensors/types.yml')
 def accessPolicy(policy_id):
-
     if request.method == 'POST' :
         response = _access_mgr.update_policy(policy_id)
-        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json')
+        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
         
     if request.method == 'DELETE' :
         response = _access_mgr.delete_policy(policy_id)
-        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json')
+        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
 
 @admin_only
 @app.route("/accessPolicies", methods=['GET'])
