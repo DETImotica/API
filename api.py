@@ -202,6 +202,14 @@ def index():
 
     return f"DETImotica API {VERSION}", 200
 
+
+
+
+
+
+
+
+
 ####################################################
 #---------Identity UA OAuth 1.0a endpoints---------#
 ####################################################
@@ -336,6 +344,12 @@ def logout():
     return Response("Logout successful.",status=200)
 
 
+
+
+
+
+
+
 ##################################################
 #---------Room data exposure endpoints-----------#
 ##################################################
@@ -344,14 +358,16 @@ def logout():
 @swag_from('docs/rooms/rooms.yml')
 def rooms():
     '''
-    todo
+    Get all rooms id that exist on our API
     '''
+
     dic = {}
     
     user_attrs = _get_user_attrs(session)
                  
     rooms = []
     for r in pgdb.getRooms():
+        #Verificar quais salas podem ser acedidas pelo utilizador
         if _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': r}):
             rooms.append(r)
     
@@ -365,25 +381,20 @@ def rooms():
 @swag_from('docs/rooms/room.yml')
 def newroom():
     '''
-    todo
+    Create a new room
     '''
-
-    # Error cases
-    # 1 - at least one of the sensors is already linked to a room
-    # 2 - at least one of the sensors doesnt exist
-
-    # In a valid case we send the id of the new room
 
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
-    #TODO FAZER QUE A DESCRICAO FIQUE OPCIONAL
-    if "name" not in details or "description" not in details:
+    #Validar as meta-informações acerca das salas
+    if "name" not in details:
         return Response(json.dumps({"error_description" : "Room details incomplete"}), status=400, mimetype='application/json')
 
-    if len(details["name"])>50 or len(details["description"])>50 :
+    if len(details["name"])>50 or ("description" in details and len(details["description"])>50) :
         return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
+    #Dois arrays para guardar os sensores que não existem e o aqueles que já estão atribuidos a uma sala
     error = {"non_existent": [], "non_free": [], "error_description": "Some of the sensors does not exist or are not free"}
 
     if sensors in details:
@@ -401,58 +412,62 @@ def newroom():
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
 
 
-@app.route("/room/<roomid>", methods=['GET', 'POST', 'DELETE'])
+@app.route("/room/<roomid>", methods=['GET'])
 @swag_from('docs/rooms/room_roomid_get.yml', methods=['GET'])
-@swag_from('docs/rooms/room_roomid_post.yml', methods=['POST'])
-@swag_from('docs/rooms/room_roomid_delete.yml', methods=['DELETE'])
+
 def room_id(roomid):
     '''
-    todo
+    [GET] Get meta-info from a room <roomid>
     '''
+
     if not pgdb.roomExists(roomid):
         return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
-    if request.method == 'GET':
-        
+    if request.method == 'GET': 
         user_attrs = _get_user_attrs(session)
         if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
             return Response(json.dumps({"error_description": f"Access denied to room {roomid}. Talk to an administrator"}), status=401, mimetype='application/json')
 
         return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
 
+    return jsonify(RESP_501), 501
+
+
+@admin_only
+@app.route("/room/<roomid>", methods=['POST', 'DELETE'])
+@swag_from('docs/rooms/room_roomid_post.yml', methods=['POST'])
+@swag_from('docs/rooms/room_roomid_delete.yml', methods=['DELETE'])
+def room_id_admin(roomid):
+    '''
+    [POST] Change meta-info from a room <roomid>
+    [DELETE] Delete a room <roomid> from the system
+    '''
+
+    if not pgdb.roomExists(roomid):
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
     if request.method == 'POST':
-        if not pgdb.isAdmin(session.get('uuid')):
-            return Response(json.dumps({"error_description": f"You have to be an administrator to do that."}), status=403, mimetype='application/json')
-
         new_details = request.json #{name: "", description: ""}"
         if ("name" in new_details and (new_details["name"])>50):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
         if ("description" in new_details and (new_details["description"]>50)):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-        #TODO podemos depois aquilo restringir com as politicas as info das salas
         pgdb.updateRoom(roomid, new_details)
         return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
 
     if request.method == 'DELETE':
-        #TODO podemos depois aquilo restringir com as politicas as info das salas
         pgdb.deleteRoom(roomid, new_details)
         return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
-
 
     return jsonify(RESP_501), 501
 
 
-
-
-
-@app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
+@app.route("/room/<roomid>/sensors", methods=['GET'])
 @swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
-@swag_from('docs/rooms/room_sensors_post.yml', methods=['POST'])
 def sensors_room_id(roomid):
     '''
-    todo
+    [GET] Get all sensors id from a room <room-id>
     '''
     user_attrs = _get_user_attrs(session)
     if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
@@ -460,17 +475,24 @@ def sensors_room_id(roomid):
     
     if request.method == 'GET': 
         if pgdb.roomExists(roomid):
-            # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
             dic = {}
             sensors = [s for s in pgdb.getSensorsFromRoom(roomid) if _pdp.get_http_req_access(request, user_attrs, opt_resource={'sensor': s})]
             dic.update(ids = sensors)
-            # TODO verificar quais sensores o user tem acesso
             return Response(json.dumps(dic), status=200, mimetype='application/json')
         return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=404, mimetype='application/json')
 
+
+@admin_only    
+@app.route("/room/<roomid>/sensors", methods=['POST'])
+@swag_from('docs/rooms/room_sensors_post.yml', methods=['POST'])
+def sensors_room_id_admin(roomid):
+    '''
+    [POST] Change the sensors that exist in a room <room-id>
+    '''
+
     if request.method == 'POST':
         if pgdb.roomExists(roomid):
-            # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
+
             details = request.json  # {"sensors": {"add" : [], "remove" : []}}
             error = {"add_sensors" : {"non_free": [], "non_existent": []}, "rm_sensors": {"diferent_room" : [], "non_existent" : []}, "error_description" : "One of the sensors sent is invalid"}
 
@@ -498,12 +520,27 @@ def sensors_room_id(roomid):
 @app.route("/room/<roomid>/sensors/full", methods=['GET'])
 ##@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
 def sensors_room_id_fullversion(roomid):
+    '''
+    [GET] Get full meta_info from all the sensors in a room <roomid>
+    '''
+
     if pgdb.roomExists(roomid):
-        # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
-        r = pgdb.getSensorsFullDescriptionFromRoom(roomid)  ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
-        # TODO verificar quais sensores o user tem acesso
-        return Response(json.dumps(r), status=200, mimetype='application/json')
+        user_attrs = _get_user_attrs(session)
+        if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
+            return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
+
+        ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
+        sensors = [s for s in pgdb.getSensorsFullDescriptionFromRoom(roomid) if _pdp.get_http_req_access(request, user_attrs, opt_resource={'sensor': s["id"]})]
+        return Response(json.dumps(sensors), status=200, mimetype='application/json')
     return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+
+
+
+
+
+
+
+
 
 ##################################################
 #---------User data exposure endpoints-----------#
@@ -554,6 +591,14 @@ def add_admin():
         return Response(json.dumps({"error_description": "No 'user' specified for the action."}), status=400,mimetype='application/json')
     return Response(json.dumps({"status": "OK"}), status=200,mimetype='application/json')
 
+
+
+
+
+
+
+
+
 ##################################################
 #---------Sensor data exposure endpoints---------#
 ##################################################
@@ -562,33 +607,35 @@ def add_admin():
 @swag_from('docs/sensors/sensors.yml')
 def sensors():
     '''
-    Get the sensors_id for a user from the database --> getAllowedSensors(bd, user_email)
+    Get the sensors_id for a user from the database
     '''
+
     user_attrs = _get_user_attrs(session)
 
     s_list = pgdb.getAllSensors()
     d = {"ids" : [tuplo[0] for tuplo in s_list if _pdp.get_http_req_access(request, user_attrs, {'sensor' : tuplo[0]})]} #{"ids" : [uuid1, uuid2]}
-    # TODO Aplicar politicas para saber quais são os Sensores que o User tem acesso
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
 @app.route("/types", methods=['GET'])
 @swag_from('docs/sensors/types.yml')
 def types():
     '''
-    Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)
+    Get all types of sensors for a user from the database
     '''
+
     user_attrs = _get_user_attrs(session)
 
     d = {"types" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : tuplo[0]})]} # {"types" : ["Temperatura", "Humidade", "Som"]}
-    #TODO Aplicar politicas para saber quais são os tipos que o User pode ter conhecimento
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
+
+@admin_only
 @app.route("/sensor", methods=['POST'])
 @swag_from('docs/sensors/sensor.yml')
 @csrf.exempt
 def new_sensor():
     '''
-    todo
+    Create a new Sensor, and register it on Hono
     '''
 
     id = uuid.uuid4()
@@ -633,28 +680,34 @@ def new_sensor():
     return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
 
 
-@app.route("/sensor/<sensorid>", methods=['GET', 'POST', 'DELETE'])
+@app.route("/sensor/<sensorid>", methods=['GET'])
 @swag_from('docs/sensors/sensor_sensorid_get.yml', methods=['GET'])
-@swag_from('docs/sensors/sensor_sensorid_post.yml', methods=['POST'])
-@swag_from('docs/sensors/sensor_sensorid_delete.yml', methods=['DELETE'])
 def sensor_description(sensorid):
     '''
-    todo
+    Get meta-info from a sensor <sensorid>
     '''
-    if _pdp.get_http_req_access(request, _get_user_attrs(session)):
-        return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
     
-    if request.method == 'GET':
-        # TODO verificar quais sensores o user tem acesso
-        try:
-            pgdb.isSensorFree(sensorid)
-            return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
-        except:
-            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+    try:
+        pgdb.isSensorFree(sensorid)
+        if not _pdp.get_http_req_access(request, _get_user_attrs(session), {'sensor' : sensorid}):
+            return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
+        return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
+    except:
+        return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+
+
+@admin_only
+@app.route("/sensor/<sensorid>", methods=['POST', 'DELETE'])
+@swag_from('docs/sensors/sensor_sensorid_post.yml', methods=['POST'])
+@swag_from('docs/sensors/sensor_sensorid_delete.yml', methods=['DELETE'])
+def sensor_description_admin(sensorid):
+    '''
+    [POST] Change the meta-info from a sensor <sensorid>
+    [DELETE] Delete a sensor <sensorid> from the system
+    '''
 
     if request.method == 'POST':
         details = request.json #{"description": "", "data" : { "type" : "", "unit_symbol" : ""}, room_id: ""}
-        # TODO verificar quais sensores o user tem acesso
 
         try:
             pgdb.isSensorFree(sensorid)
@@ -687,7 +740,6 @@ def sensor_description(sensorid):
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
 
     if request.method == 'DELETE':
-        # TODO verificar quais sensores o user tem acesso
         try:
             pgdb.isSensorFree(sensorid)
             pgdb.deleteSensor(sensorid)
@@ -701,8 +753,15 @@ def sensor_description(sensorid):
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
 @swag_from('docs/sensors/sensor_measure.yml')
 def sensor_measure(sensorid, option):
-    if _pdp.get_http_req_access(request, _get_user_attrs(session)):
-        return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
+    '''
+    Get the measures from a sensor <sensorid>
+        - <option> instant  - get the last value
+        - <option> interval - get the all the value in an interval
+        - <option> median   - get the median of the values in an interval
+    '''
+
+    if not _pdp.get_http_req_access(request, _get_user_attrs(session), {'sensor' : sensorid}):
+            return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
 
     try:
         pgdb.isSensorFree(sensorid)
@@ -747,16 +806,22 @@ def sensor_event(sensorid, option):
 
 
 
+
+
+
+
+
+
+
 ####################################################
 ##              Type Data Methods                 ##
 ####################################################
 
-
+@admin_only
 @app.route("/type", methods=['POST'])
 ##@swag_from('docs/sensors/types.yml')
 def new_type():
     details = request.json  # {"name" : "" ,"description" : ""}
-    # TODO Veficar se a pessoa é um admin
 
     if "description" not in details or "name" not in details:
         return Response(json.dumps({"error_description": "New Data Type Details Incomplete"}), status=400, mimetype='application/json')
@@ -770,20 +835,27 @@ def new_type():
     pgdb.createSensorType(details)
     return Response(json.dumps({"name": details["name"]}), status=200, mimetype='application/json')
 
-@app.route("/type/<typename>", methods=['GET', 'POST', 'DELETE'])
+@app.route("/type/<typename>", methods=['GET'])
 ##@swag_from('docs/sensors/types.yml')
 def typesFromName(typename):
+    user_attrs = _get_user_attrs(session)
     
     if not pddb.datatypeExists(typename):
         return Response(json.dumps({"error_description": "The name type sent does not exist"}), status=400, mimetype='application/json')
 
-    if request.method == 'GET':
-        #TODO verificar se o utilizador tem permissao para esta ação
+    if not _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : typename}):
+        Response(json.dumps({"error description": f"Access denied to type of sensor {typename}. Talk to an administrator."}), status=401, mimetype='application/json')
 
-        return Response(json.dumps(pgdb.getSensorType(typename)), status=200, mimetype='application/json')
+    return Response(json.dumps(pgdb.getSensorType(typename)), status=200, mimetype='application/json')
+
+    
+
+@admin_only
+@app.route("/type/<typename>", methods=['POST', 'DELETE'])
+##@swag_from('docs/sensors/types.yml')
+def typesFromName_admin(typename):
 
     if request.method == 'POST':
-        #TODO verificar se o utilizador tem permissao para esta ação
 
         details = request.json #{"description" : ""}
 
@@ -794,12 +866,17 @@ def typesFromName(typename):
         return Response(json.dumps({"name" : typename}), status=200, mimetype='application/json')
 
     if request.method == 'DELETE':
-        #TODO verificar se o utilizador tem permissao para esta ação
         if pgdb.getSensorsFromType(typename) != []:
             return Response(json.dumps({"error_description" : "Cannot remove a sensor type that has at least one sensor"}, status=400, mimetype='application/json'))
 
         pgdb.deleteSensorType(typename)
         return Response(json.dumps({"name" : typename}, status=200, mimetype='application/json'))
+
+
+
+
+
+
 
 
 ####################################################
