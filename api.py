@@ -510,7 +510,7 @@ def new_sensor():
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
     #TODO Veficar se a pessoa é um admin
 
-     if "data" not in details:
+    if "data" not in details:
         return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
 
     if "description" in details and len(details["description"])>50:
