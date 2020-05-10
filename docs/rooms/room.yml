@@ -39,4 +39,45 @@ responses:
         id:
           $ref: "#/definitions/uuid"
   '400':
-    description: At least one sensor already exists or is assigned to a different room
+    enum: ["Room details incomplete", "One of the detail fields has more than 50 characters"]
+    description: >
+      Returns an error description in this list:
+        * Room details incomplete
+        * One of the detail fields has more than 50 characters
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Room details incomplete
+  '401':
+    description: Returns an error, as the room is not available for the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404':
+    description: Returns an error description, and the sensors id that are not available to insert
+    schema:
+      non_existent: sensors ids that do not exist
+      non_free: sensors ids that are already associated to a room
+      error_description: error_details_message
+      properties:
+        non_existent:
+          type: array
+          description: List of sensors
+          items:
+            $ref: "#/definitions/uuid"
+        non_free:
+          type: array
+          description: List of sensors
+          items:
+            type: uuid
+            example: '42fef63c-0642-42a0-93de-9e71bcc2649f'
+        error_description:
+          type: string
+          example: Some of the sensors does not exist or are not free
+        
+     
