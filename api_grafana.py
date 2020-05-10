@@ -4,9 +4,10 @@ Flask REST API endpoints for Grafana support
 
 import uuid
 import json
-
+import time
+import re
 from calendar import timegm
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request, Response, abort
 from flask_cors import CORS
 
@@ -54,8 +55,21 @@ def graf_query():
     res= []
     for t in targets:
         datapoints= []
-        time_st= req['range']['from']
-        time_end= req['range']['to']
+        try:
+            time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(req['range']['from'])/1000))
+            time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(req['range']['to'])/1000))
+        except ValueError:
+            if len((req['range']['to']).split('-')) > 1:
+                if 'm' in (req['range']['to']).split('-')[1]:
+                    time_end= datetime.now()-timedelta(minutes= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
+                else:
+                    time_end= datetime.now()-timedelta(hours= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
+            else:
+                time_end= datetime.now()
+            if 'm' in req['range']['from']:
+                time_st= time_end-timedelta(minutes= int(re.findall('\d+',req['range']['from'])[0]))
+            else:
+                time_st= time_end-timedelta(hours= int(re.findall('\d+',req['range']['from'])[0]))
         try:
             query= json.loads(influxdb.query_avg(t,time_st, time_end,req['interval']))
         except ValueError:
