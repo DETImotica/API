@@ -6,7 +6,7 @@ produces:
 - application/json
 responses:
   '200':
-    description: Returns all sensor types currently registered on the system
+    description: Returns all sensor types currently registered on the system that are available for the user
     schema:
       properties:
         types:

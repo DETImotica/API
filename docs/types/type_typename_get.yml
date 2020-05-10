@@ -1,0 +1,33 @@
+Get a new sensor type
+---
+tags:
+- Types
+produces:
+- application/json
+parameters:
+  - name: typename
+    in: path
+    type: string
+    description: type's name of the sensor type
+    required: true
+responses:
+  '200':
+    description: Returns the meta-info of the type
+    schema:
+      $ref: "#/definitions/type_metadata"
+  '401':
+    description: Returns an error, as this type is not available
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to type of sensor
+  '404': 
+    description: The Type's name already exist 
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The name type sent does not exist

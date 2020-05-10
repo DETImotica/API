@@ -33,5 +33,19 @@ responses:
     description: Returns all metadata information on the given sensor
     schema:
       $ref: "#/definitions/sensor_metadata"
+  '401':
+    description: Returns an error, as the sensor is not available to the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to sensor
   '404':
-    description: The specified sensor was not found
+    description: Returns an error, sensor id sent in the form does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The sensorid does not exist

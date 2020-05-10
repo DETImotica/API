@@ -15,21 +15,25 @@ responses:
     description: Returns a list of the meta data from the sensors
     schema:
       properties:
-        id:
-          $ref: "#/definitions/uuid"
-        description:
-          type: string
-          example: 'Proveniente de um Sensor TSL2561, taxa de amostragem de 3 segundos'
-      data:
-        properties:
-          type:
-            type: string
-            example: 'Luminosidade'
-          unit_symbol:
-            type: string
-            example: 'Lux'
-      room_id:
-        $ref: "#/definitions/uuid"
+        sensors:
+          type: array
+          items:
+            properties:
+              id:
+                $ref: "#/definitions/uuid"
+              description:
+                type: string
+                example: 'Proveniente de um Sensor TSL2561, taxa de amostragem de 3 segundos'
+              data:
+                properties:
+                  type:
+                    type: string
+                    example: 'Luminosidade'
+                  unit_symbol:
+                    type: string
+                    example: 'Lux'
+              room_id:
+                $ref: "#/definitions/uuid"
   '401':
     description: Returns an error, as the room is not available for the user
     schema:

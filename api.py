@@ -447,13 +447,13 @@ def sensors_room_id(roomid):
 
 
 @app.route("/room/<roomid>/sensors/full", methods=['GET'])
-##@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
+@swag_from('docs/rooms/room_sensors_full_get.yml')
 def sensors_room_id_fullversion(roomid):
     if pgdb.roomExists(roomid):
         # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
         r = pgdb.getSensorsFullDescriptionFromRoom(roomid)  ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
         # TODO verificar quais sensores o user tem acesso
-        return Response(json.dumps(r), status=200, mimetype='application/json')
+        return Response(json.dumps({"sensors": r}), status=200, mimetype='application/json')
     return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
 ##################################################
@@ -659,7 +659,7 @@ def sensor_event(sensorid, option):
 
 
 @app.route("/type", methods=['POST'])
-##@swag_from('docs/sensors/types.yml')
+@swag_from('docs/types/type.yml')
 def new_type():
     details = request.json  # {"name" : "" ,"description" : ""}
     # TODO Veficar se a pessoa é um admin
@@ -676,8 +676,8 @@ def new_type():
     pgdb.createSensorType(details)
     return Response(json.dumps({"name": details["name"]}), status=200, mimetype='application/json')
 
-@app.route("/type/<typename>", methods=['GET', 'POST', 'DELETE'])
-##@swag_from('docs/sensors/types.yml')
+@app.route("/type/<typename>", methods=['GET'])
+@swag_from('docs/types/type_typename_get.yml')
 def typesFromName(typename):
     
     if not pddb.datatypeExists(typename):
@@ -706,9 +706,19 @@ def typesFromName(typename):
 
         pgdb.deleteSensorType(typename)
         return Response(json.dumps({"name" : typename}, status=200, mimetype='application/json'))
-        
+
+@app.route("/type/<typename>", methods=['POST', 'DELETE'])
+@swag_from('docs/types/type_typename_post.yml', methods=['POST'])
+@swag_from('docs/types/type_typename_delete.yml', methods=['DELETE'])
+def typesFromName_admin(typename):
+    pass        
 
 
+@app.route("/types", methods=['GET'])
+@swag_from('docs/types/types.yml')
+def typesFromName_admin_test(typename):
+    pass  
+ 
 
 
 # run self-signed and self-managed PKI instead of self-signed certificate
