@@ -470,7 +470,7 @@ def users():
     return jsonify(RESP_501), 501
 
 @app.route("/identity")
-@swag_from('docs/users/identity.yml')
+##@swag_from('docs/users/identity.yml')
 def get_username():
     return _get_attr('card', session.get('at'), session.get('ats'))
 
