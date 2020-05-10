@@ -27,6 +27,7 @@ from flasgger import Swagger, swag_from
 from flask_wtf.csrf import CSRFProtect
 from hashlib import sha3_256
 from requests_oauthlib import OAuth1
+from Crypto.Protocol.KDF import PBKDF2
 
 from access import PDP, PolicyManager
 from datadb import DataDB
@@ -677,7 +678,8 @@ def new_sensor():
     #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
     pgdb.createSensor(id, details)
-    return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
+    sensor_key = base64.b64encode(PBKDF2(secret['secret_key'] + id, secret['secret_salt'], 16, conf['kdf_iterations'], None)).decode('utf-8')
+    return Response(json.dumps({"id": id, "key": sensor_key}), status=200, mimetype='application/json')
 
 
 @app.route("/sensor/<sensorid>", methods=['GET'])
@@ -749,6 +751,12 @@ def sensor_description_admin(sensorid):
 
     return jsonify(RESP_501), 501
 
+
+@admin_only
+@app.route("/sensor/<sensorid>/key", methods=['GET'])
+def sensor_key(sensorid):
+    key = base64.b64encode(PBKDF2(secret['secret_key'] + sensorid, secret['secret_salt'], 16, conf['kdf_iterations'], None)).decode('utf-8')
+    return Response(json.dumps({"key": key}), status=200, mimetype='application/json')
 
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
 @swag_from('docs/sensors/sensor_measure.yml')

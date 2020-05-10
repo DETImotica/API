@@ -218,7 +218,24 @@ class PolicyManager(ABAC):
 
     def update_policy(self, req):
         '''PAP - modify policy'''
-        return False, "Not implemented"
+        details = req.json
+
+        inicial_policy = self._storage.get(details["id"]).to_json()
+        self.storage.delete(details["id"])
+
+        if "subjects" in details:
+            inicial_policy["subjects"] = details["subjects"]
+        if "effect" in details:
+            inicial_policy["effect"] = details["effect"]
+        if "resources" in details:
+            inicial_policy["resources"] = details["resources"]
+        if "actions" in details:
+            inicial_policy["actions"] = details["actions"]
+
+        self.storage.add(inicial_policy.from_json())
+        return True
+
+        #return False, "Not implemented"
 
     def delete_policy(self, id):
         '''Deletes a policy from the PRP, given UUID4-type ID.'''
