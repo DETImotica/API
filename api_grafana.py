@@ -10,7 +10,6 @@ from calendar import timegm
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request, Response, abort
 from flask_cors import CORS
-
 from pgdb import PGDB
 from datadb import DataDB
 
@@ -45,7 +44,7 @@ def graf_search():
 
 @grafana.route('/query', methods=['POST'])
 def graf_query():
-    req= request.get_json()
+    req= request.json
     targets= []
     for t in req['targets']:
         if 'target' in t.keys():
@@ -56,32 +55,35 @@ def graf_query():
     for t in targets:
         datapoints= []
         try:
-            time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(req['range']['from'])/1000))
-            time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(req['range']['to'])/1000))
+            time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['from'])/1000))
+            time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['to'])/1000))
         except ValueError:
+            # Alerts (range example: ['5m', 'now'])
             if len((req['range']['to']).split('-')) > 1:
                 if 'm' in (req['range']['to']).split('-')[1]:
-                    time_end= datetime.now()-timedelta(minutes= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
+                    time_end= datetime.utcnow()-timedelta(minutes= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
+                elif 'h' in (req['range']['to']).split('-')[1]:
+                    time_end= datetime.utcnow()-timedelta(hours= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
                 else:
-                    time_end= datetime.now()-timedelta(hours= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
+                    return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
             else:
-                time_end= datetime.now()
+                time_end= datetime.utcnow()
             if 'm' in req['range']['from']:
                 time_st= time_end-timedelta(minutes= int(re.findall('\d+',req['range']['from'])[0]))
-            else:
+            elif 'h' in req['range']['from']:
                 time_st= time_end-timedelta(hours= int(re.findall('\d+',req['range']['from'])[0]))
+            else:
+                return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
         try:
-            query= json.loads(influxdb.query_avg(t,time_st, time_end,req['interval']))
+            query= json.loads(influxdb.query_avg(t,time_st, time_end,'30s'))
         except ValueError:
-            abort('404', Exception('Received object is not in correct format.'))
-        result= query['values']
-        for r in result:
-            datapoints.append([r['value'],convert_to_time_ms(r['time'])])
+            return Response(json.dumps({"error_description": "There was a error obtaning data, try again later"}), status=500, mimetype='application/json')
+        datapoints= [[r['value'],convert_to_time_ms(r['time'])] for r in query['values'] if r['value']!= None]
         res.append({"target":t,"datapoints":datapoints})    
     return jsonify(res)
 
 @grafana.route('/annotations', methods=['POST'])
 def graf_annotations():
-    #TODO for M4 (Annotations for outages,...)
+    # No annotations implemented
     return jsonify([])    
 
