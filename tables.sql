@@ -33,9 +33,11 @@ CREATE TABLE Utilizador (
 	uuid UUID,
 	Email varchar(50) not null,
 	admin BOOLEAN default false,
-	Perfil varchar(50),            -- grupo a que pertence (vai depender
+	           -- grupo a que pertence (vai depender
 								  -- de como fazemos as politicas)
-	PRIMARY KEY (Email)
+	PRIMARY KEY(uuid)
+	UNIQUE(Email),
+	
 );
 
 

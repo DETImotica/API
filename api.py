@@ -385,6 +385,9 @@ def newroom():
     Create a new room
     '''
 
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
@@ -448,6 +451,9 @@ def room_id_admin(roomid):
         return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
     if request.method == 'POST':
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
         new_details = request.json #{name: "", description: ""}"
         if ("name" in new_details and (new_details["name"])>50):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
@@ -492,6 +498,9 @@ def sensors_room_id_admin(roomid):
     '''
 
     if request.method == 'POST':
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
         if pgdb.roomExists(roomid):
 
             details = request.json  # {"sensors": {"add" : [], "remove" : []}}
@@ -552,9 +561,76 @@ def sensors_room_id_fullversion(roomid):
 @swag_from('docs/users/users.yml')
 def users():
     '''
-    Get all users (pelo menos uma chave) from the database --> getUsers(bd)
+    Get all users uuid from the database 
     '''
-    return jsonify(RESP_501), 501
+    return Response(json.dumps({"ids": pgdb.getUsers()}), status=200,mimetype='application/json')
+
+
+
+@admin_only
+@app.route("/user", methods=['POST'])
+#@swag_from('docs/users/users.yml')
+def user_id():
+    '''
+    [POST] Insert a new user on the system
+    '''
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+    user_details = request.json()
+
+    if "email" not in user_details or "admin" not in user_details :
+        return Response(json.dumps({"error_description": "User Details incomplete"}), status=400, mimetype='application/json')
+
+    if pgdb.emailExists(user_details["email"]):
+        return Response(json.dumps({"error_description": "User Email already exists"}), status=400, mimetype='application/json')
+
+    user_id = uuid.uuid4()
+    pgdb.InsertUser(user_id, user_details)
+    return Response(json.dumps({"id": str(user_id)}), status=200, mimetype='application/json')
+
+
+
+
+@admin_only
+@app.route("/user/<userid>", methods=['GET','POST','DELETE'])
+#@swag_from('docs/users/users.yml')
+def user_id(userid):
+    '''
+    [GET] Get info from a user <userid>
+    [POST] Change the admin state
+    [DELETE] DELETE user <userid> from the system
+    '''
+
+    if request.method == 'GET':
+        if not pgdb.hasUser(userid):
+            return Response(json.dumps({"error_description": "User does not exist"}), status=404, mimetype='application/json')
+
+        return Response(json.dumps(pgdb.getUser(userid))), status=200, mimetype='application/json')
+
+    if request.method == 'POST':
+        if not pgdb.hasUser(userid):
+            return Response(json.dumps({"error_description": "User does not exist"}), status=404, mimetype='application/json')
+
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+        details = request.json
+        details["admin"] = details["admin"].lower()
+        if details["admin"] != "true" and details["admin"] != "false":
+            return Response(json.dumps({"error_description": "Admin field new value should be 'true' or 'false'"}), status=400, mimetype='application/json')
+
+        pgdb.changeUserAdmin(userid, details["admin"])
+        return Response(json.dumps({"id": userid}), status=200, mimetype='application/json')
+
+
+    if request.method == 'DELETE':
+        if not pgdb.hasUser(userid):
+            return Response(json.dumps({"error_description": "User does not exist"}), status=404, mimetype='application/json')
+
+        pgdb.deleteUser(userid)
+        return Response(json.dumps({"id": userid}), status=200, mimetype='application/json')
+
 
 @app.route("/identity", methods=['GET'])
 def identity():
@@ -570,32 +646,6 @@ def identity():
             **_get_attr('student_courses', at, ats),
             **_get_attr('teacher_courses', at, ats)
     }), status=200, content_type='application/json')
-
-@admin_only
-@app.route("/user/<internalid>", methods=['POST'])
-@swag_from('docs/users/user.yml')
-def user_policy(internalid):
-    '''
-    Change access policy on the database from the JSON received.
-    '''
-    return jsonify(RESP_501), 501
-
-@admin_only
-@app.route("/add_admin", methods=['POST'])
-def add_admin():
-    if not request.json:
-        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
-
-    if 'user' in request.json:
-        pgdb.updateUserAdminStatus(request.json['user'])
-    else:
-        return Response(json.dumps({"error_description": "No 'user' specified for the action."}), status=400,mimetype='application/json')
-    return Response(json.dumps({"status": "OK"}), status=200,mimetype='application/json')
-
-
-
-
-
 
 
 
@@ -638,6 +688,9 @@ def new_sensor():
     '''
     Create a new Sensor, and register it on Hono
     '''
+
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
 
     id = uuid.uuid4()
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
@@ -709,6 +762,9 @@ def sensor_description_admin(sensorid):
     '''
 
     if request.method == 'POST':
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
         details = request.json #{"description": "", "data" : { "type" : "", "unit_symbol" : ""}, room_id: ""}
 
         try:
@@ -834,6 +890,9 @@ def sensor_event(sensorid, option):
 @app.route("/type", methods=['POST'])
 ##@swag_from('docs/sensors/types.yml')
 def new_type():
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
     details = request.json  # {"name" : "" ,"description" : ""}
 
     if "description" not in details or "name" not in details:
@@ -869,6 +928,8 @@ def typesFromName(typename):
 def typesFromName_admin(typename):
 
     if request.method == 'POST':
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
 
         details = request.json #{"description" : ""}
 

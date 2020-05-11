@@ -224,9 +224,12 @@ class PGDB(object):
     def hasUser(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),))
+        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),)
+        if cursor.fetchone() == None:
+            db_con.close()
+            return False
         db_con.close()
-        return False
+        return True
 
     def addUser(self, id, email, admin=False, politica=None):
         if not (id and email and admin):
@@ -235,7 +238,7 @@ class PGDB(object):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
 
-        cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s, %s);", (str(id), str(email), str(admin), 'null'))
+        cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s);", (str(id), str(email), str(admin)))
         db_con.commit()
         db_con.close()
         return True
@@ -250,14 +253,6 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
         return True
-
-    def updateUserAdminStatus(self, email, admin=False):
-        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
-        cursor = db_con.cursor()
-        cursor.execute("UPDATE Utilizador SET admin = %s WHERE email = %s;", (str(admin), str(email)))
-        db_con.commit()
-        db_con.close()
-        return False
 
 
     def createSensorType(self, details):
@@ -311,3 +306,40 @@ class PGDB(object):
             return []
         return [t[0] for t in l_tuplos]
 
+    def getUsers(self):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Email FROM Utilizador;")
+        l_tuplos = cursor.fetchall()
+        db_con.close()
+        return [t[0] for t in l_tuplos]
+
+
+    def InsertUser(self, userid, userdata):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s);", (str(userid), userdata["email"], roomdata["admin"]))
+        db_con.commit()
+        db_con.close()
+
+    def getUser(self, userid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Email, admin FROM Utilizador WHERE uuid = %s;", (str(userid),))
+        tuplo = cursor.fetchone()
+        db_con.close()
+        return {"email": tuplo[0], "admin": tuplo[1]}
+
+    def changeUserAdmin(self, userid, admin_state):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("UPDATE Utilizador SET admin = %s WHERE uuid = %s;", (str(admin), str(userid)))
+        db_con.commit()
+        db_con.close()
+
+    def deleteUser(self, userid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("DELETE FROM Utilizador WHERE uuid = %s;", (str(userid),))
+        db_con.commit()
+        sb_con.close()
