@@ -755,6 +755,11 @@ def sensor_description_admin(sensorid):
 @admin_only
 @app.route("/sensor/<sensorid>/key", methods=['GET'])
 def sensor_key(sensorid):
+    try:
+            pgdb.isSensorFree(sensorid)
+        except:
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+            
     key = base64.b64encode(PBKDF2(secret['secret_key'] + sensorid, secret['secret_salt'], 16, conf['kdf_iterations'], None)).decode('utf-8')
     return Response(json.dumps({"key": key}), status=200, mimetype='application/json')
 

@@ -223,6 +223,8 @@ class PolicyManager(ABAC):
         inicial_policy = self._storage.get(details["id"]).to_json()
         self.storage.delete(details["id"])
 
+
+        #TODO Verificações
         if "subjects" in details:
             inicial_policy["subjects"] = details["subjects"]
         if "effect" in details:
@@ -231,6 +233,10 @@ class PolicyManager(ABAC):
             inicial_policy["resources"] = details["resources"]
         if "actions" in details:
             inicial_policy["actions"] = details["actions"]
+        if "context" in details:
+            inicial_policy["context"] = details["context"]
+        if "description" in details:
+            inicial_policy["description"] = details["description"]
 
         self.storage.add(inicial_policy.from_json())
         return True
