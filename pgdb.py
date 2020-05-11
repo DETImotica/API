@@ -280,6 +280,9 @@ class PGDB(object):
     def updateSensorType(self, name, new_details):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
+        if "name" in new_details:
+            cursor.execute("UPDATE TipoSensor SET Nome = %s WHERE Nome = %s;", (new_details["name"], str(name)))
+
         if "description" in new_details:
             cursor.execute("UPDATE TipoSensor SET Descricao = %s WHERE Nome = %s;", (new_details["description"], str(name)))
 

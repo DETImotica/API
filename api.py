@@ -931,13 +931,18 @@ def typesFromName_admin(typename):
         if not request.json:
             return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
 
-        details = request.json #{"description" : ""}
+        details = request.json #{"name" : "", description" : ""}
+
+        if ("name" in details) and len(details["name"] > 50):
+            return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
         if ("description" in details) and len(details["description"] > 50):
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
         pgdb.updateSensorType(typename, details)
-        return Response(json.dumps({"name" : typename}), status=200, mimetype='application/json')
+        if "name" not in details:
+            return Response(json.dumps({"name" : typename}), status=200, mimetype='application/json')
+        return Response(json.dumps({"name" : details["name"]}), status=200, mimetype='application/json')
 
     if request.method == 'DELETE':
         if pgdb.getSensorsFromType(typename) != []:
