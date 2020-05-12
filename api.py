@@ -6,6 +6,7 @@ DETImotica API: Flask REST API module
 authors: Goncalo Perna, Eurico Dias
 """
 
+import base64
 import configparser
 import random
 import sys
@@ -20,14 +21,17 @@ from urllib.parse import parse_qs
 import requests
 import datetime
 
-from flask import Flask, abort, flash, g, jsonify, redirect, Response, request, session, url_for
+from flask import Flask, abort, flash, jsonify, make_response, redirect, Response, request, session, url_for
 from flask_caching import Cache
 from flask_paranoid import Paranoid
 from flasgger import Swagger, swag_from
+from flask.sessions import SecureCookieSessionInterface
 from flask_wtf.csrf import CSRFProtect
-from hashlib import sha3_256
+from hashlib import sha1, sha3_256, md5
 from requests_oauthlib import OAuth1
 from Crypto.Protocol.KDF import PBKDF2
+
+from datetime import datetime
 
 from access import PDP, PolicyManager
 from datadb import DataDB
@@ -50,8 +54,8 @@ _SUPPORTED_SCOPES = ['uu', 'name',
 app = Flask(__name__)
 app.register_blueprint(grafana)
 app.config['JSON_SORT_KEYS'] = False
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = False
 app.config['CACHE_TYPE'] = "filesystem"
 app.config['CACHE_DIR'] = ".app_attr_cache/"
 app.config['CACHE_DEFAULT_TIMEOUT'] = 3600*24
@@ -102,6 +106,14 @@ config = configparser.ConfigParser()
 config.read(".appconfig")
 ck = config['info']['consumer_key']
 cs = config['info']['consumer_secret']
+dk = config['info']['debug_key']
+_ak = config['info']['app_key']
+_mkid = config['info']['manager_id']
+_gkid = config['info']['grafana_id']
+
+_aes_gw_salt = config['info']['gw_secret_salt']
+_aes_gw_key = config['info']['gw_secret_key']
+_gw_kdf_iter = config['info']['gw_kdf_iterations']
 
 pgdb = PGDB()
 influxdb = DataDB()
@@ -151,9 +163,11 @@ def _get_attr(scope, at, ats):
 # validate the token
 def _validate_token(uuid, email):
     at = session_cache.get(uuid)
-    ats = session_cache.get(at)
+    if not at:
+        return False
 
-    if not at or not ats:
+    ats = session_cache.get(at)
+    if not ats:
         return False
 
     uu = _get_attr('uu', at, ats)
@@ -172,6 +186,20 @@ def _get_user_attrs(s):
                     **_get_attr('teacher_courses', at, ats)
            }
 
+def _decode_flask_cookie(cookie_str):
+    from itsdangerous import URLSafeTimedSerializer
+    from flask.sessions import TaggedJSONSerializer
+    
+    salt = 'cookie-session'
+
+    serializer = TaggedJSONSerializer()
+    signer_kwargs = {
+        'key_derivation': 'hmac',
+        'digest_method': sha1
+    }
+    s = URLSafeTimedSerializer(_ak, salt=salt, serializer=serializer, signer_kwargs=signer_kwargs)
+    return s.loads(cookie_str)
+
 # Admin only endpoint decorator
 def admin_only(f):
     @wraps(f)
@@ -186,16 +214,54 @@ def admin_only(f):
 
 @app.before_request
 def before_req_f():
-    if request.path == "/login":
+    print(request.path)
+    if "login" in request.path:
+        print((session.get('user'), session.get('uuid')))
         if session.get('user') and session.get('uuid'):
             if _validate_token(session.get('uuid'), session.get('user')):
-                if request.referer:
-                    return redirect(url_for(request.referer))
-                else:
-                    return redirect(url_for('.index'))
-    elif request.path != "/spec" and "grafana" not in request.path and "auth_callback" not in request.path:
-        if not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
-            return redirect(url_for('.login'), code=307)
+                if 'app' not in session:
+                    return Response("OK", 200)
+                elif 'redirect_url' in session:
+                    appid = session.get('app')
+                    if appid == _mkid:
+                        session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+                        session_cookie = session_serializer.dumps(dict(session))
+                        return redirect(session.get('redirect_url') + "?s=" + session_cookie, 301)
+                    elif appid == _gkid:
+                        r = make_response(redirect(request.host_url+"dashboards", 302))
+                        r.headers['User'] = session.get('user')
+                        return r
+                    else:
+                        session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+                        session_cookie = session_serializer.dumps(dict(session))
+                        return redirect(session.get('redirect_url') + "?s=" + session_cookie, 301)
+                return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
+#        elif request.cookies.get("fls"):
+#            fls = _decode_flask_cookie(request.cookies.get("fls"))
+#            if fls:
+#                if fls.get('user') and fls.get('uuid'):
+#                    if _validate_token(fls.get('uuid'), fls.get('user')):
+#                        r = make_response(redirect(request.host_url+"dashboards", 301))
+#                        r.headers['User'] = fls.get('user')
+    elif request.path == "/wsauthverify":
+        pass
+    elif request.path != "/spec" and "/docs" not in request.path and "grafana" not in request.path and "auth_callback" not in request.path:
+        print((session.get('user'), session.get('uuid')))
+        if "debug" in request.headers:
+            if request.headers['debug'] == dk:
+                pass
+        elif not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
+            return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
+
+@app.after_request
+def after_req(response):
+    h = response.headers
+    h['Access-Control-Allow-Origin'] = '*'
+    h['Access-Control-Allow-Methods'] = '*'
+    h['Access-Control-Allow-Headers'] = '*'
+
+    print(response.get_data())
+    return response
 
 @app.route("/", methods=['GET', 'HEAD'])
 def index():
@@ -203,18 +269,9 @@ def index():
 
     return f"DETImotica API {VERSION}", 200
 
-
-
-
-
-
-
-
-
 ####################################################
 #---------Identity UA OAuth 1.0a endpoints---------#
 ####################################################
-
 @app.route("/login", methods=['GET'])
 @swag_from('docs/session/login.yml')
 def login():
@@ -223,7 +280,15 @@ def login():
     It consists of setting up an OAuth1.0a session up to the 'authorize' phase, redirecting to the identity's auth_url.
     Final steps of OAuth1.0a are done on the auth_callback endpoint (and emulate authentication).
     """
-
+    dom = request.args.get('app')
+    print(dom)
+    redir = request.args.get('redirect_url')
+    
+    if dom:
+        session['app'] = dom
+        if redir:
+            session['redirect_url'] = redir
+    
     oauth_p1 = OAuth1(ck,
                       client_secret=cs,
                       signature_method=OAUTH_SIGNATURE,
@@ -234,18 +299,17 @@ def login():
     resp = requests.post("https://identity.ua.pt/oauth/request_token", auth=oauth_p1)
 
     if resp.status_code != 200:
-        return Response(json.dumps({
-                         "error_description": f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b><br>Please contact an administrator."
-                        }),
-                        status=resp.status_code,
-                        content_type="application/json"
+        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",
+                        status=resp.status_code
                         )
 
     resp_json = parse_qs(resp.content.decode("utf-8"))
-
+    if not 'oauth_token' in resp_json or not 'oauth_token_secret' in resp_json:
+        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",                                       status=500                                                                                                          )
     session['_rt'] = (resp_json['oauth_token'][0], resp_json['oauth_token_secret'][0])
 
     return redirect(f"https://identity.ua.pt/oauth/authorize?oauth_token={session['_rt'][0]}&oauth_token_secret={session['_rt'][0]}", 302)
+
 
 @app.route("/auth_callback", methods=['GET'])
 @swag_from('docs/session/auth_callback.yml')
@@ -258,14 +322,10 @@ def auth_callback():
     ot = request.args.get('oauth_token')
 
     if not ov or not ot:
-        return Response(json.dumps({"error_descrption": "OAuth error.<br>Server returned: <b>Invalid request.</b>"}),
-                        status=400,
-                        mimetype="application/json")
+        return Response("OAuth error.<br>Server returned: <b>Invalid request.</b>", status=400)
 
     if request.args.get('consent'):
-        return Response(json.dumps({"error_description": "OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>"}),
-                        status=401,
-                        mimetype="application/json")
+        return Response("OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>", status=401)
 
     rt = session.pop('_rt')
     oauth_access =  OAuth1(ck,
@@ -282,18 +342,14 @@ def auth_callback():
     resp_json = parse_qs(resp.content.decode("utf-8"))
 
     if not resp_json:
-        return Response(json.dumps({"error_description": f"OAuth Error.<br>Server returned: <b>{resp.content.decode()}</b>"}),
-                        status=resp.status_code,
-                        mimetype="application/json")
+        return Response(f"Error.\nServer returned: <b>{resp.content.decode()}</b>", status=resp.status_code)
 
     try:
         at = resp_json['oauth_token'][0]
         ats = resp_json['oauth_token_secret'][0]
     except KeyError:
-        return Response(json.dumps({'error_description': """OAuth Error. Please contact an administrator.<br>
-                        Server returned: <b>OAuth Server error</b>"""}),
-                        status=500, 
-                        mimetype="application/json")
+        return Response("""OAuth Error. Please contact an administrator.<br>
+                        Server returned: <b>OAuth Server error</b>""", status=500)
 
     # cache attributes
     uu = _get_attr('uu', at, ats)
@@ -317,8 +373,33 @@ def auth_callback():
     # add user if it doesn't exist.
     if (not pgdb.hasUser(uu['iupi'])):
         pgdb.addUser(uu['iupi'], uu['email'], False)
-
-    return Response(json.dumps({**uu, **name}), status=200, mimetype='application/json')
+    
+    if 'app' in session and session['app'] == _gkid:
+        #expiry_epoch = int(datetime.utcnow().timestamp()) + _graf_lnk_expiry_s
+        #h_str = str(expiry_epoch) + session['user'] + _gkid
+        #h = md5(h_str.encode()).digest()
+        #h = (base64.b64encode(h)).decode()
+        #for o, r in [("=", ""),  ("+", "-"), ("/", "_")]:
+        #    h = h.replace(o, r)
+        #new_url = request.host_url + "?user=" + session['user'] + "&app=" + _gkid + "&md5=" + h + "&expires=" + str(expiry_epoch)
+        #print(new_url)
+        #session_cache.set(_gkid + ";=;" + session['user'], new_url)
+        #return Response(f'<a href="{new_url}">Go to Grafana</a>', 200)
+        #session.pop('app')
+        session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+        session_cookie = session_serializer.dumps(dict(session))
+        r = make_response(redirect(request.host_url + "dashboards/", 302))
+        #r.headers['fls'] = session_cookie
+        r.set_cookie("fls", session_cookie)
+        #return Response(f'<a href="{request.host_url + "grafana/"}">Go to Grafana</a>', headers={"fls", session_cookie}, status=302, url=request.host_url+"grafana/")
+        return r
+    if 'app' in session and 'redirect_url' in session:
+        loc = session.get('redirect_url')
+        if loc:
+            session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+            session_cookie = session_serializer.dumps(dict(session))
+            return redirect(loc + "?s=" + session_cookie, 301)
+    return Response(json.dumps({**uu, **name}), status=200, content_type='application/json')
 
 @app.route("/logout", methods=['GET'])
 @swag_from('docs/session/logout.yml')
@@ -326,30 +407,53 @@ def logout():
     '''
     Logout endpoint
     '''
-    if not session.get('user') or not session.get('uuid') or not session.get('x'):
-        Response({"error_description": "Bad request. Server returned: <b>You are not logged in.<b>"},
-                    status=400,
-                    content_type="application/json")
+    if not session.get('user') or not session.get('uuid'):
+        Response("Logout bad request. Server returned: <b>You are not logged in.<b>",status=400)
     
+    print(session.get('user'))
+    print(session.get('uuid'))
+    
+    user = session.get('user')
+    uuid = session.get('uuid')
+
+    at = session_cache.get(uuid)
+    if not at:
+        return Response(json.dumps({"error_description": "Session expired. Please login."}), status=401, mimetype="application/json")
+    
+    ats = session_cache.get(at)
+
     #clear cache
     for s in _SUPPORTED_SCOPES:
-        cache.delete_memoized(_get_attr, s, session.get('x'), session.get('y'))
-
-    at = session_cache.get(session.get('uuid'))
+        cache.delete_memoized(_get_attr, s, at, ats)
     session_cache.delete(at)
-
-    session_cache.delete(session.get('uuid'))
+    session_cache.delete(uuid)
+    #session_cache.delete(_gkid + ";=;" + user)
 
     #clear session
     session.clear()
-    return Response("Logout successful.",status=200)
 
+    
+    r = Response("Logout successful.", status=200)
+    r.set_cookie('fls', "", expires=0)
+    return r
 
+@app.route("/wsauthverify")
+def auth_verify():
+    # if session is passed through a header, that is the session
+    fls = request.cookies.get("fls")
+    print(fls)
 
-
-
-
-
+    if not fls:
+        fls = session
+    else:
+        fls = _decode_flask_cookie(fls)
+    
+    if fls.get('user') and fls.get('uuid'):
+        if _validate_token(fls.get('uuid'), fls.get('user')):
+            r = Response("OK", 200)
+            r.headers['User'] = fls.get('user')
+            return r
+    return ("NOK", 401)
 
 ##################################################
 #---------Room data exposure endpoints-----------#
@@ -361,7 +465,6 @@ def rooms():
     '''
     Get all rooms id that exist on our API
     '''
-
     dic = {}
     
     user_attrs = _get_user_attrs(session)
@@ -464,7 +567,7 @@ def room_id_admin(roomid):
         return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
 
     if request.method == 'DELETE':
-        pgdb.deleteRoom(roomid, new_details)
+        pgdb.deleteRoom(roomid)
         return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
 
     return jsonify(RESP_501), 501
@@ -545,13 +648,6 @@ def sensors_room_id_fullversion(roomid):
     return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
 
-
-
-
-
-
-
-
 ##################################################
 #---------User data exposure endpoints-----------#
 ##################################################
@@ -582,8 +678,8 @@ def user_id():
     if "email" not in user_details or "admin" not in user_details :
         return Response(json.dumps({"error_description": "User Details incomplete"}), status=400, mimetype='application/json')
 
-    if pgdb.emailExists(user_details["email"]):
-        return Response(json.dumps({"error_description": "User Email already exists"}), status=400, mimetype='application/json')
+    # if pgdb.emailExists(user_details["email"]):
+    #     return Response(json.dumps({"error_description": "User Email already exists"}), status=400, mimetype='application/json')
 
     user_id = uuid.uuid4()
     pgdb.InsertUser(user_id, user_details)
@@ -595,7 +691,7 @@ def user_id():
 @admin_only
 @app.route("/user/<userid>", methods=['GET','POST','DELETE'])
 #@swag_from('docs/users/users.yml')
-def user_id(userid):
+def user_id_admin(userid):
     '''
     [GET] Get info from a user <userid>
     [POST] Change the admin state
@@ -606,7 +702,7 @@ def user_id(userid):
         if not pgdb.hasUser(userid):
             return Response(json.dumps({"error_description": "User does not exist"}), status=404, mimetype='application/json')
 
-        return Response(json.dumps(pgdb.getUser(userid))), status=200, mimetype='application/json')
+        return Response(json.dumps(pgdb.getUser(userid)), status=200, mimetype='application/json')
 
     if request.method == 'POST':
         if not pgdb.hasUser(userid):
@@ -632,23 +728,15 @@ def user_id(userid):
         return Response(json.dumps({"id": userid}), status=200, mimetype='application/json')
 
 
-@app.route("/identity", methods=['GET'])
-def identity():
+@app.route("/identity")
+#@swag_from('docs/users/identity.yml')
+def get_username():
     '''
     Get user session information
     '''
-    at = session_cache.get(session.get('uuid'))
-    ats = session_cache.get(at)
-
-    return Response(json.dumps({**_get_attr('uu', at, ats),
-            **_get_attr('name', at, ats),
-            **_get_attr('student_info', at, ats),
-            **_get_attr('student_courses', at, ats),
-            **_get_attr('teacher_courses', at, ats)
-    }), status=200, content_type='application/json')
-
-
-
+    return Response(json.dumps({**_get_attr('uu', session.get('at'), session.get('ats')),
+            **_get_attr('name', session.get('at'), session.get('ats')),
+           }), status=200, mimetype='application/json')
 
 ##################################################
 #---------Sensor data exposure endpoints---------#
@@ -731,7 +819,7 @@ def new_sensor():
     #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
     pgdb.createSensor(id, details)
-    sensor_key = base64.b64encode(PBKDF2(secret['secret_key'] + id, secret['secret_salt'], 16, conf['kdf_iterations'], None)).decode('utf-8')
+    sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + id, _aes_gw_salt, 16, _gw_kdf_iter, None)).decode('utf-8')
     return Response(json.dumps({"id": id, "key": sensor_key}), status=200, mimetype='application/json')
 
 
@@ -812,11 +900,11 @@ def sensor_description_admin(sensorid):
 @app.route("/sensor/<sensorid>/key", methods=['GET'])
 def sensor_key(sensorid):
     try:
-            pgdb.isSensorFree(sensorid)
-        except:
-            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+        pgdb.isSensorFree(sensorid)
+    except:
+        return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
             
-    key = base64.b64encode(PBKDF2(secret['secret_key'] + sensorid, secret['secret_salt'], 16, conf['kdf_iterations'], None)).decode('utf-8')
+    key = base64.b64encode(PBKDF2(_aes_gw_key + sensorid, _aes_gw_salt, 16, _gw_kdf_iter, None)).decode('utf-8')
     return Response(json.dumps({"key": key}), status=200, mimetype='application/json')
 
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
@@ -912,7 +1000,7 @@ def new_type():
 def typesFromName(id):
     user_attrs = _get_user_attrs(session)
     
-    if not pddb.datatypeExists(id):
+    if not pgdb.datatypeExists(id):
         return Response(json.dumps({"error_description": "The name type sent does not exist"}), status=400, mimetype='application/json')
 
     if not _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : id}):

@@ -224,7 +224,7 @@ class PGDB(object):
     def hasUser(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),)
+        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),))
         if cursor.fetchone() == None:
             db_con.close()
             return False
@@ -258,10 +258,10 @@ class PGDB(object):
     def createSensorType(self, details):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("INSERT INTO TipoSensor VALUES (%s, %s);", (details["name"], details["description"]))
+        id = cursor.execute("INSERT INTO TipoSensor VALUES (%s, %s) RETURNING id;", (details["name"], details["description"]))
         db_con.commit()
         db_con.close()
-
+        return id
 
     def getSensorType(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
@@ -295,7 +295,7 @@ class PGDB(object):
         cursor = db_con.cursor()
         cursor.execute("DELETE FROM TipoSensor WHERE id = %s;", (str(id),))
         db_con.commit()
-        sb_con.close()
+        db_con.close()
 
 
     def getSensorsFromType(self, type_name):
@@ -321,7 +321,7 @@ class PGDB(object):
     def InsertUser(self, userid, userdata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        id = cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s); RETURNING id", (str(userid), userdata["email"], roomdata["admin"]))
+        id = cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s); RETURNING id", (str(userid), userdata["email"], userdata["admin"]))
         db_con.commit()
         db_con.close()
         return id
@@ -337,7 +337,7 @@ class PGDB(object):
     def changeUserAdmin(self, userid, admin_state):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("UPDATE Utilizador SET admin = %s WHERE uuid = %s;", (str(admin), str(userid)))
+        cursor.execute("UPDATE Utilizador SET admin = %s WHERE uuid = %s;", (str(admin_state), str(userid)))
         db_con.commit()
         db_con.close()
 
@@ -346,4 +346,4 @@ class PGDB(object):
         cursor = db_con.cursor()
         cursor.execute("DELETE FROM Utilizador WHERE uuid = %s;", (str(userid),))
         db_con.commit()
-        sb_con.close()
+        db_con.close()
