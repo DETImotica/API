@@ -656,6 +656,16 @@ def users():
     '''
     return Response(json.dumps({"ids": pgdb.getUsers()}), status=200,mimetype='application/json')
 
+
+@app.route("/users/full", methods=['GET'])
+@admin_only
+@swag_from('docs/users/users.yml')
+def users_full():
+    '''
+    Get all users uuid from the database 
+    '''
+    return Response(json.dumps(pgdb.getUsersFull()), status=200,mimetype='application/json')
+
 @app.route("/user", methods=['POST'])
 @admin_only
 #@swag_from('docs/users/users.yml')
@@ -789,7 +799,7 @@ def new_sensor():
     if len(details["data"]["unit_symbol"])>3:
         return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}), status=400,mimetype='application/json')
 
-    if not pgdb.datatypeExists(details["data"]["type"]):
+    if not pgdb.datatypeNameExists(details["data"]["type"]):
         return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
     
     user_attrs = _get_user_attrs(session)
@@ -855,7 +865,7 @@ def sensor_description_admin(sensorid):
 
         if "data" in details:
             if "type" in details["data"]:
-                    if not pgdb.datatypeExists(details["data"]["type"]):
+                    if not pgdb.datatypeNameExists(details["data"]["type"]):
                         return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
                     if len(details["data"]["type"])>50:
                         return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
@@ -864,7 +874,7 @@ def sensor_description_admin(sensorid):
                         return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}),status=400, mimetype='application/json')
 
 
-        if "data" in details and "type" in details["data"] and not pgdb.datatypeExists(details["data"]["type"]):
+        if "data" in details and "type" in details["data"] and not pgdb.datatypeNameExists(details["data"]["type"]):
             return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
 
 
@@ -970,7 +980,7 @@ def new_type():
     if len(details["description"]) > 50 or len(details["name"]) > 50:
         return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-    if pgdb.datatypeExists(details["name"]) :
+    if pgdb.datatypeNameExists(details["name"]) :
         return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
 
     id = pgdb.createSensorType(details)
@@ -981,8 +991,8 @@ def new_type():
 def typesFromName(id):
     user_attrs = _get_user_attrs(session)
     
-    if not pgdb.datatypeExists(id):
-        return Response(json.dumps({"error_description": "The name type sent does not exist"}), status=400, mimetype='application/json')
+    if not pgdb.datatypeIdExists(id):
+        return Response(json.dumps({"error_description": "The type id sent does not exist"}), status=400, mimetype='application/json')
 
     if not _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : id}):
         Response(json.dumps({"error description": f"Access denied to type of sensor {id}. Talk to an administrator."}), status=401, mimetype='application/json')
@@ -1005,6 +1015,9 @@ def typesFromName_admin(typename):
 
         if ("description" in details) and len(details["description"] > 50):
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+        if pgdb.datatypeNameExists(details["name"]) :
+            return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
 
         pgdb.updateSensorType(id, details)
         return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')

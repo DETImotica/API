@@ -182,10 +182,20 @@ class PGDB(object):
         db_con.close()
         return True
 
-    def datatypeExists(self, id):
+    def datatypeNameExists(self, name):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT Descricao FROM TipoSensor WHERE id = %s;", (id,))
+        cursor.execute("SELECT Descricao FROM TipoSensor WHERE Nome = %s;", (str(id),))
+        if cursor.fetchone() == None:
+            db_con.close()
+            return False
+        db_con.close()
+        return True
+
+    def datatypeIdExists(self, id):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Descricao FROM TipoSensor WHERE id = %s;", (str(id),))
         if cursor.fetchone() == None:
             db_con.close()
             return False
@@ -297,11 +307,12 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
 
-
-    def getSensorsFromType(self, type_name):
+    #TODO pode rebentar
+    def getSensorsFromType(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT Sensor.id FROM TipoSensor JOIN Sensor ON Nome_TipoSensor = TipoSensor.Nome WHERE TipoSensor.Nome = %s;", (str(type_name),))
+        cursor.execture("")
+        cursor.execute("SELECT Sensor.id FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON Nome_TipoSensor = X.Nome;", (str(id),))
         l_tuplos = cursor.fetchall()
         db_con.close()
 
@@ -312,12 +323,22 @@ class PGDB(object):
     def getUsers(self):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT Email FROM Utilizador;")
+        cursor.execute("SELECT uuid FROM Utilizador;")
         l_tuplos = cursor.fetchall()
         db_con.close()
         return [t[0] for t in l_tuplos]
 
 
+    def getUsersFull(self):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT uuid, Email, admin FROM Utilizador;")
+        l_tuplos = cursor.fetchall()
+        db_con.close()
+        return [{"id": t[0] ,"email" : t[1],"admin": t[2]} for t in l_tuplos]
+
+
+    #TODO pode rebentar
     def InsertUser(self, userid, userdata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -329,7 +350,7 @@ class PGDB(object):
     def getUser(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT Email, admin FROM Utilizador WHERE uuid = %s;", (str(userid),))
+        cursor.execute("SELECT email, admin FROM Utilizador WHERE uuid = %s;", (str(userid),))
         tuplo = cursor.fetchone()
         db_con.close()
         return {"email": tuplo[0], "admin": tuplo[1]}
