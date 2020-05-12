@@ -202,14 +202,13 @@ class PGDB(object):
         db_con.close()
         return True
 
-    
-        
-
     def isAdmin(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         cursor.execute("SELECT admin FROM Utilizador WHERE uuid = %s;", (userid,))
         res = cursor.fetchone()
+        if not res:
+            return False
         db_con.close()
         return bool(res[0])
 
@@ -242,7 +241,7 @@ class PGDB(object):
         return True
 
     def addUser(self, id, email, admin=False, politica=None):
-        if not (id and email and admin):
+        if not (id and email):
             return False
 
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)

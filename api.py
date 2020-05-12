@@ -483,6 +483,7 @@ def rooms():
 @app.route("/room", methods=['POST'])
 @admin_only
 @swag_from('docs/rooms/room.yml')
+@csrf.exempt
 def newroom():
     '''
     Create a new room
@@ -541,6 +542,7 @@ def room_id(roomid):
 @admin_only
 @swag_from('docs/rooms/room_roomid_post.yml', methods=['POST'])
 @swag_from('docs/rooms/room_roomid_delete.yml', methods=['DELETE'])
+@csrf.exempt
 def room_id_admin(roomid):
     '''
     [POST] Change meta-info from a room <roomid>
@@ -591,6 +593,7 @@ def sensors_room_id(roomid):
 @app.route("/room/<roomid>/sensors", methods=['POST'])
 @admin_only
 @swag_from('docs/rooms/room_sensors_post.yml', methods=['POST'])
+@csrf.exempt
 def sensors_room_id_admin(roomid):
     '''
     [POST] Change the sensors that exist in a room <room-id>
@@ -669,6 +672,7 @@ def users_full():
 @app.route("/user", methods=['POST'])
 @admin_only
 #@swag_from('docs/users/users.yml')
+@csrf.exempt
 def user_id():
     '''
     [POST] Insert a new user on the system
@@ -691,6 +695,7 @@ def user_id():
 @app.route("/user/<userid>", methods=['GET','POST','DELETE'])
 @admin_only
 #@swag_from('docs/users/users.yml')
+@csrf.exempt
 def user_id_admin(userid):
     '''
     [GET] Get info from a user <userid>
@@ -843,6 +848,7 @@ def sensor_description(sensorid):
 @admin_only
 @swag_from('docs/sensors/sensor_sensorid_post.yml', methods=['POST'])
 @swag_from('docs/sensors/sensor_sensorid_delete.yml', methods=['DELETE'])
+@csrf.exempt
 def sensor_description_admin(sensorid):
     '''
     [POST] Change the meta-info from a sensor <sensorid>
@@ -914,7 +920,6 @@ def sensor_measure(sensorid, option):
         - <option> interval - get the all the value in an interval
         - <option> median   - get the median of the values in an interval
     '''
-
     if not _pdp.get_http_req_access(request, _get_user_attrs(session), {'sensor' : sensorid}):
             return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
 
@@ -967,6 +972,7 @@ def sensor_event(sensorid, option):
 @app.route("/type", methods=['POST'])
 @admin_only
 ##@swag_from('docs/sensors/types.yml')
+@csrf.exempt
 def new_type():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
@@ -1000,9 +1006,10 @@ def typesFromName(id):
 
 @app.route("/type/<id>", methods=['POST', 'DELETE'])
 @admin_only
+@csrf.exempt
 ##@swag_from('docs/sensors/types.yml')
 def typesFromName_admin(typename):
-
+    
     if request.method == 'POST':
         if not request.json:
             return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
@@ -1034,6 +1041,7 @@ def typesFromName_admin(typename):
 
 @app.route("/accessPolicy", methods=['POST'])
 @admin_only
+@csrf.exempt
 def newAccessPolicy():
     response = _access_mgr.create_policy(request)
     if not response[0]:
@@ -1042,6 +1050,7 @@ def newAccessPolicy():
 
 @app.route("/accessPolicy/<policyid>", methods=['POST', 'DELETE'])
 @admin_only
+@csrf.exempt
 ##@swag_from('docs/sensors/types.yml')
 def accessPolicy(policy_id):
     if request.method == 'POST' :
@@ -1058,11 +1067,6 @@ def accessPolicy(policy_id):
 def getAllAccessPolicies():
     return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')
 
-
-
-
-# run self-signed and self-managed PKI instead of self-signed certificate
-# (or a real cert?)
 if __name__ == "__main__":
     try:
         config.read(".appconfig")
