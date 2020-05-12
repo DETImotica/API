@@ -138,7 +138,7 @@ class PolicyManager(ABAC):
             if type(req_json['subjects']) is not list:
                 return False, "ERROR: malformed access JSON - 'subjects' must be a list."
 
-            subject = [{k : rules.Eq(s[k])} for s in req_json['subjects'] for k in s]
+            subject = [{k : (rules.Eq(s[k]) if k != 'admin' else rules.Truthy())} for s in req_json['subjects'] for k in s]
             if not subject:
                 return False, "ERROR: malformed access JSON - 'subjects' has no value defined."
             ####
@@ -245,6 +245,8 @@ class PDP(ABAC):
         """
         if not subject_data:
             return False
+
+        subject_data.update({'admin': self._pgdb.isAdmin(subject_data['iupi'])})
 
         resource_path = req.path.split("/")
 

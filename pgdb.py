@@ -65,8 +65,6 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
 
-
-
     def getSensorsFromRoom(self, roomid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -95,7 +93,7 @@ class PGDB(object):
             cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (str(roomid), s))
 
         for s in changes["remove"]:
-            cursor.execute("UPDATE Sensor SET ID_Espaco = Null WHERE ID = %s;", (str(roomid), s))
+            cursor.execute("UPDATE Sensor SET ID_Espaco = Null WHERE ID = %s;", (str(roomid),))
         
         db_con.commit()
         db_con.close()
@@ -121,14 +119,14 @@ class PGDB(object):
         if "room_id" not in sensordata:
             sensordata["room_id"] = "Null"
 
-        cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (sensorid, sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
+        cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (str(sensorid), sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
         db_con.commit()
         db_con.close()
 
     def deleteSensor(self, sensorid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("DELETE FROM Sensor WHERE Sensor.ID = %s;", (sensorid,))
+        cursor.execute("DELETE FROM Sensor WHERE Sensor.ID = %s;", (str(sensorid),))
         db_con.commit()
         db_con.close()
 
@@ -137,13 +135,13 @@ class PGDB(object):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         if "description" in sensordata:
-            cursor.execute("UPDATE Sensor SET Descricao = %s WHERE ID = %s;", (sensordata["description"], sensorid))
+            cursor.execute("UPDATE Sensor SET Descricao = %s WHERE ID = %s;", (sensordata["description"], str(sensorid)))
         if "data" in sensordata and "type" in sensordata["data"]:
-            cursor.execute("UPDATE Sensor SET Nome_TipoSensor = %s WHERE ID = %s;", (sensordata["data"]["type"], sensorid))
+            cursor.execute("UPDATE Sensor SET Nome_TipoSensor = %s WHERE ID = %s;", (sensordata["data"]["type"], str(sensorid)))
         if "data" in sensordata and "unit_symbol" in sensordata["data"]:
-            cursor.execute("UPDATE Sensor SET Simbolo = %s WHERE ID = %s;", (sensordata["data"]["unit_symbol"], sensorid))
+            cursor.execute("UPDATE Sensor SET Simbolo = %s WHERE ID = %s;", (sensordata["data"]["unit_symbol"], str(sensorid)))
         if "room_id" in sensordata:
-            cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (sensordata["room_id"], sensorid))
+            cursor.execute("UPDATE Sensor SET ID_Espaco = %s WHERE ID = %s;", (sensordata["room_id"], str(sensorid)))
 
         db_con.commit()
         db_con.close()
@@ -151,7 +149,7 @@ class PGDB(object):
     def isSensorFree(self, sensorid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id=%s;", (sensorid,))
+        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id=%s;", (str(sensorid),))
         result = cursor.fetchone()
 
         if result == None :
@@ -163,7 +161,7 @@ class PGDB(object):
     def isSensorRoom(self, sensorid, roomid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id=%s;", (sensorid,))
+        cursor.execute("SELECT ID_Espaco FROM Sensor WHERE id=%s;", (str(sensorid),))
         result = cursor.fetchone()
 
         if result == None :
@@ -267,7 +265,7 @@ class PGDB(object):
     def createSensorType(self, details):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        id = cursor.execute("INSERT INTO TipoSensor VALUES (%s, %s) RETURNING id;", (details["name"], details["description"]))
+        id = cursor.execute("INSERT INTO TipoSensor (Nome, Descricao) VALUES (%s, %s) RETURNING id;", (details["name"], details["description"]))
         db_con.commit()
         db_con.close()
         return id
