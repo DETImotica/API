@@ -1008,8 +1008,7 @@ def typesFromName(id):
 @admin_only
 @csrf.exempt
 ##@swag_from('docs/sensors/types.yml')
-def typesFromName_admin(typename):
-    
+def typesFromName_admin(id):
     if request.method == 'POST':
         if not request.json:
             return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
