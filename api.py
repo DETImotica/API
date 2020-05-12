@@ -1070,7 +1070,7 @@ def newAccessPolicy():
     return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
 
 @admin_only
-@app.route("/accessPolicy/<policy-id>", methods=['POST', 'DELETE'])
+@app.route("/accessPolicy/<policyid>", methods=['POST', 'DELETE'])
 ##@swag_from('docs/sensors/types.yml')
 def accessPolicy(policy_id):
     if request.method == 'POST' :
