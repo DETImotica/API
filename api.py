@@ -1002,7 +1002,7 @@ def typesFromName(id):
 @app.route("/type/<id>", methods=['POST', 'DELETE'])
 @admin_only
 ##@swag_from('docs/sensors/types.yml')
-def typesFromName_admin(typename):
+def typesFromName_admin(id):
 
     if request.method == 'POST':
         if not request.json:
