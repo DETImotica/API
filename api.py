@@ -734,7 +734,7 @@ def get_username():
     '''
     Get user session information
     '''
-    at = session_cache.get('uuid')
+    at = session_cache.get(session.get('uuid'))
     ats = session_cache.get(at)
     return Response(json.dumps({**_get_attr('uu', at, ats),
             **_get_attr('name', at, ats),
@@ -872,7 +872,6 @@ def sensor_description_admin(sensorid):
             if "unit_symbol" in details["data"]:
                     if len(details["data"]["unit_symbol"])>3:
                         return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}),status=400, mimetype='application/json')
-
 
         if "data" in details and "type" in details["data"] and not pgdb.datatypeNameExists(details["data"]["type"]):
             return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
