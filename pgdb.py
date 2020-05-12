@@ -216,7 +216,7 @@ class PGDB(object):
     def getAllSensorTypes(self):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT Nome FROM TipoSensor;")
+        cursor.execute("SELECT id FROM TipoSensor;")
         res = cursor.fetchall()
         db_con.close()
         return res
