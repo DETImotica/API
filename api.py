@@ -771,7 +771,7 @@ def types():
 
     user_attrs = _get_user_attrs(session)
 
-    d = {"types" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : tuplo[0]})]} # {"types" : ["Temperatura", "Humidade", "Som"]}
+    d = {"ids" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : tuplo[0]})]} # {"types" : ["Temperatura", "Humidade", "Som"]}
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
 @app.route("/sensor", methods=['POST'])

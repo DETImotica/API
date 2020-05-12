@@ -274,7 +274,7 @@ class PGDB(object):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         ##TODO verificar se esta query funciona como esperado
-        cursor.execute("SELECT Descricao, Distinct Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;", (str(id),))
+        cursor.execute("SELECT DISTINCT Descricao, Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;", (str(id),))
         
         l_tuplos = cursor.fetchall()
         l_simbolos = [t[1] for t in l_tuplos]
