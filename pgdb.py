@@ -182,10 +182,10 @@ class PGDB(object):
         db_con.close()
         return True
 
-    def datatypeExists(self, name):
+    def datatypeExists(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT Descricao FROM TipoSensor WHERE Nome = %s;", (name,))
+        cursor.execute("SELECT Descricao FROM TipoSensor WHERE id = %s;", (id,))
         if cursor.fetchone() == None:
             db_con.close()
             return False
@@ -263,11 +263,11 @@ class PGDB(object):
         db_con.close()
 
 
-    def getSensorType(self, name):
+    def getSensorType(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         ##TODO verificar se esta query funciona como esperado
-        cursor.execute("SELECT Descricao, Distinct Simbolo FROM TipoSensor JOIN Sensor ON TipoSensor.Nome = Nome_TipoSensor WHERE TipoSensor.Nome = %s;", (str(name),))
+        cursor.execute("SELECT Descricao, Distinct Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;", (str(id),))
         
         l_tuplos = cursor.fetchall()
         l_simbolos = [t[1] for t in l_tuplos]
@@ -277,23 +277,23 @@ class PGDB(object):
         return {"description" : description, "units" : l_simbolos}
 
 
-    def updateSensorType(self, name, new_details):
+    def updateSensorType(self, id, new_details):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         if "name" in new_details:
-            cursor.execute("UPDATE TipoSensor SET Nome = %s WHERE Nome = %s;", (new_details["name"], str(name)))
+            cursor.execute("UPDATE TipoSensor SET Nome = %s WHERE id = %s;", (new_details["name"], str(id)))
 
         if "description" in new_details:
-            cursor.execute("UPDATE TipoSensor SET Descricao = %s WHERE Nome = %s;", (new_details["description"], str(name)))
+            cursor.execute("UPDATE TipoSensor SET Descricao = %s WHERE id = %s;", (new_details["description"], str(id)))
 
         db_con.commit()
         db_con.close()
 
 
-    def deleteSensorType(self, name):
+    def deleteSensorType(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("DELETE FROM TipoSensor WHERE Nome = %s;", (str(name),))
+        cursor.execute("DELETE FROM TipoSensor WHERE id = %s;", (str(id),))
         db_con.commit()
         sb_con.close()
 
@@ -321,9 +321,10 @@ class PGDB(object):
     def InsertUser(self, userid, userdata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s);", (str(userid), userdata["email"], roomdata["admin"]))
+        id = cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s); RETURNING id", (str(userid), userdata["email"], roomdata["admin"]))
         db_con.commit()
         db_con.close()
+        return id
 
     def getUser(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)

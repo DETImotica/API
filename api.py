@@ -904,26 +904,26 @@ def new_type():
     if pgdb.datatypeExists(details["name"]) :
         return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
 
-    pgdb.createSensorType(details)
-    return Response(json.dumps({"name": details["name"]}), status=200, mimetype='application/json')
+    id = pgdb.createSensorType(details)
+    return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
 
-@app.route("/type/<typename>", methods=['GET'])
+@app.route("/type/<id>", methods=['GET'])
 ##@swag_from('docs/sensors/types.yml')
-def typesFromName(typename):
+def typesFromName(id):
     user_attrs = _get_user_attrs(session)
     
-    if not pddb.datatypeExists(typename):
+    if not pddb.datatypeExists(id):
         return Response(json.dumps({"error_description": "The name type sent does not exist"}), status=400, mimetype='application/json')
 
-    if not _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : typename}):
-        Response(json.dumps({"error description": f"Access denied to type of sensor {typename}. Talk to an administrator."}), status=401, mimetype='application/json')
+    if not _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : id}):
+        Response(json.dumps({"error description": f"Access denied to type of sensor {id}. Talk to an administrator."}), status=401, mimetype='application/json')
 
-    return Response(json.dumps(pgdb.getSensorType(typename)), status=200, mimetype='application/json')
+    return Response(json.dumps(pgdb.getSensorType(id)), status=200, mimetype='application/json')
 
     
 
 @admin_only
-@app.route("/type/<typename>", methods=['POST', 'DELETE'])
+@app.route("/type/<id>", methods=['POST', 'DELETE'])
 ##@swag_from('docs/sensors/types.yml')
 def typesFromName_admin(typename):
 
@@ -939,17 +939,15 @@ def typesFromName_admin(typename):
         if ("description" in details) and len(details["description"] > 50):
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-        pgdb.updateSensorType(typename, details)
-        if "name" not in details:
-            return Response(json.dumps({"name" : typename}), status=200, mimetype='application/json')
-        return Response(json.dumps({"name" : details["name"]}), status=200, mimetype='application/json')
+        pgdb.updateSensorType(id, details)
+        return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
 
     if request.method == 'DELETE':
-        if pgdb.getSensorsFromType(typename) != []:
+        if pgdb.getSensorsFromType(id) != []:
             return Response(json.dumps({"error_description" : "Cannot remove a sensor type that has at least one sensor"}, status=400, mimetype='application/json'))
 
-        pgdb.deleteSensorType(typename)
-        return Response(json.dumps({"name" : typename}, status=200, mimetype='application/json'))
+        pgdb.deleteSensorType(id)
+        return Response(json.dumps({"id" : id}, status=200, mimetype='application/json'))
 
 
 

@@ -10,8 +10,8 @@ CREATE TABLE Espaco (
 	Unique (Nome) 				--maybe
 );
 
-
 CREATE TABLE TipoSensor (
+	id SERIAL,
 	Nome varchar(50) not null,			--EX Temperatura
 	Descricao varchar(50),		--Não sei bem que dados seriam aqui
 	PRIMARY KEY (Nome)
