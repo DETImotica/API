@@ -662,6 +662,16 @@ def users():
     return Response(json.dumps({"ids": pgdb.getUsers()}), status=200,mimetype='application/json')
 
 
+@admin_only
+@app.route("/users/full", methods=['GET'])
+@swag_from('docs/users/users.yml')
+def users():
+    '''
+    Get all users uuid from the database 
+    '''
+    return Response(json.dumps(pgdb.getUsersFull())), status=200,mimetype='application/json')
+
+
 
 @admin_only
 @app.route("/user", methods=['POST'])
@@ -989,7 +999,7 @@ def new_type():
     if len(details["description"]) > 50 or len(details["name"]) > 50:
         return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-    if pgdb.datatypeExists(details["name"]) :
+    if pgdb.datatypeNameExists(details["name"]) :
         return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
 
     id = pgdb.createSensorType(details)
@@ -1000,8 +1010,8 @@ def new_type():
 def typesFromName(id):
     user_attrs = _get_user_attrs(session)
     
-    if not pgdb.datatypeExists(id):
-        return Response(json.dumps({"error_description": "The name type sent does not exist"}), status=400, mimetype='application/json')
+    if not pgdb.datatypeIdExists(id):
+        return Response(json.dumps({"error_description": "The type id sent does not exist"}), status=400, mimetype='application/json')
 
     if not _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : id}):
         Response(json.dumps({"error description": f"Access denied to type of sensor {id}. Talk to an administrator."}), status=401, mimetype='application/json')
@@ -1026,6 +1036,9 @@ def typesFromName_admin(typename):
 
         if ("description" in details) and len(details["description"] > 50):
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+        if pgdb.datatypeNameExists(details["name"]) :
+            return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
 
         pgdb.updateSensorType(id, details)
         return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
