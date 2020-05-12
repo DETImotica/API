@@ -1,0 +1,59 @@
+Update admin state of a user with userid
+---
+tags:
+- Users
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+parameters:
+  - name: userid
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+  - in: body
+    name: body
+    required: true
+    description: new state of admin's role state
+    schema:
+      properties:
+        admin:
+          type: string
+          example: "true"
+responses:
+  '200':
+    description: Returns the id of the user that was changed
+    schema:
+      id: user_id
+      properties:
+        id:
+          $ref: "#/definitions/uuid"
+  '400':
+    enum: ["Empty JSON or empty body", "Admin field new value should be 'true' or 'false'"]
+    description: >
+      Returns an error description in this list:
+        * Empty JSON or empty body
+        * Admin field new value should be 'true' or 'false
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Admin field new value should be 'true' or 'false
+  '401':
+    description: Returns an error as only admins can change the users informations
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404':
+    description: Returns an error, as the user id does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The userid does not exist

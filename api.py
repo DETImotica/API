@@ -474,15 +474,20 @@ def users():
 def get_username():
     return _get_attr('card', session.get('at'), session.get('ats'))
 
-@admin_only
-@app.route("/user/<internalid>", methods=['POST'])
-@swag_from('docs/users/user.yml')
-def user_policy(internalid):
-    '''
-    Change access policy on the database from the JSON received.
-    '''
-    return jsonify(RESP_501), 501
 
+@admin_only
+@app.route("/sensor/<sensorid>/key", methods=['GET'])
+@swag_from('docs/sensors/sensor_sensorid_key.yml')
+def sensor_key(sensorid):
+    pass
+
+@admin_only
+@app.route("/user/<userid>", methods=['GET','POST','DELETE'])
+@swag_from('docs/users/users_userid_get.yml', methods=['GET'])
+@swag_from('docs/users/users_userid_post.yml', methods=['POST'])
+@swag_from('docs/users/users_userid_delete.yml', methods=['DELETE'])
+def user_id(userid):
+    pass
 
 ##################################################
 #---------Sensor data exposure endpoints---------#
