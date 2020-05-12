@@ -147,14 +147,14 @@ class PolicyManager(ABAC):
             if type(req_json['actions']) is not list:
                 return False, "ERROR: malformed access JSON - 'actions' must be a list."
 
-            action = [rules.Eq(a) for a in req_json['actions']]
-            if not action:
-                return False, "ERROR: malformed access JSON - 'actions' has no value defined."
+            action = [rules.Any()]
+            if ['actions'] in req_json:
+                action = [rules.Eq(a) for a in req_json['actions']]
 
             ####
             # 'resource' is not mandatory, defaults to any element
             ####
-            resource = rules.Any()
+            resource = [rules.Any()]
             if 'resource' in req_json:
                 resource = [{k : rules.Eq(req_json['resource'][k])} for k in req_json['resource']]
             
@@ -218,30 +218,7 @@ class PolicyManager(ABAC):
 
     def update_policy(self, req):
         '''PAP - modify policy'''
-        details = req.json
-
-        inicial_policy = self._storage.get(details["id"]).to_json()
-        self.storage.delete(details["id"])
-
-
-        #TODO Verificações
-        if "subjects" in details:
-            inicial_policy["subjects"] = details["subjects"]
-        if "effect" in details:
-            inicial_policy["effect"] = details["effect"]
-        if "resources" in details:
-            inicial_policy["resources"] = details["resources"]
-        if "actions" in details:
-            inicial_policy["actions"] = details["actions"]
-        if "context" in details:
-            inicial_policy["context"] = details["context"]
-        if "description" in details:
-            inicial_policy["description"] = details["description"]
-
-        self.storage.add(inicial_policy.from_json())
-        return True
-
-        #return False, "Not implemented"
+        return False, "Not implemented"
 
     def delete_policy(self, id):
         '''Deletes a policy from the PRP, given UUID4-type ID.'''
@@ -272,17 +249,17 @@ class PDP(ABAC):
         resource_path = req.path.split("/")
 
         resource = {}
-        if resource_path[1] in ['rooms', 'types', 'sensor', 'newroom']: ### newroom nao existe
+        if resource_path[1] in ['rooms', 'types', 'sensor', 'newroom']:
             if opt_resource:
                 resource.update(opt_resource)
             else:
                 return False
-        if resource_path[1] == 'room': ### prob mais um if
+        if resource_path[1] == 'room':
             resource.update({resource_path[1]: resource_path[2]})
         elif resource_path[1] == 'sensor':
             if len(resource_path) < 3:
                 if opt_resource:
-                    resource.update(opt_resource) ##verficar pois isto ja e feito em cima
+                    resource.update(opt_resource)
                 else:
                     return False
             else:

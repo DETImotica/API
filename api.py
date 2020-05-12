@@ -480,8 +480,8 @@ def rooms():
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 
-@admin_only
 @app.route("/room", methods=['POST'])
+@admin_only
 @swag_from('docs/rooms/room.yml')
 def newroom():
     '''
@@ -521,12 +521,10 @@ def newroom():
 
 @app.route("/room/<roomid>", methods=['GET'])
 @swag_from('docs/rooms/room_roomid_get.yml', methods=['GET'])
-
 def room_id(roomid):
     '''
     [GET] Get meta-info from a room <roomid>
     '''
-
     if not pgdb.roomExists(roomid):
         return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
@@ -539,9 +537,8 @@ def room_id(roomid):
 
     return jsonify(RESP_501), 501
 
-
-@admin_only
 @app.route("/room/<roomid>", methods=['POST', 'DELETE'])
+@admin_only
 @swag_from('docs/rooms/room_roomid_post.yml', methods=['POST'])
 @swag_from('docs/rooms/room_roomid_delete.yml', methods=['DELETE'])
 def room_id_admin(roomid):
@@ -558,9 +555,9 @@ def room_id_admin(roomid):
             return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
 
         new_details = request.json #{name: "", description: ""}"
-        if ("name" in new_details and (new_details["name"])>50):
+        if ("name" in new_details and len(new_details["name"])>50):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
-        if ("description" in new_details and (new_details["description"]>50)):
+        if ("description" in new_details and len(new_details["description"])>50):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
         pgdb.updateRoom(roomid, new_details)
@@ -590,10 +587,9 @@ def sensors_room_id(roomid):
             dic.update(ids = sensors)
             return Response(json.dumps(dic), status=200, mimetype='application/json')
         return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=404, mimetype='application/json')
-
-
-@admin_only    
+    
 @app.route("/room/<roomid>/sensors", methods=['POST'])
+@admin_only
 @swag_from('docs/rooms/room_sensors_post.yml', methods=['POST'])
 def sensors_room_id_admin(roomid):
     '''
@@ -629,7 +625,6 @@ def sensors_room_id_admin(roomid):
             pgdb.updateSensorsFromRoom(roomid, details)
             return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
 
-
 @app.route("/room/<roomid>/sensors/full", methods=['GET'])
 ##@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
 def sensors_room_id_fullversion(roomid):
@@ -652,8 +647,8 @@ def sensors_room_id_fullversion(roomid):
 #---------User data exposure endpoints-----------#
 ##################################################
 
-@admin_only
 @app.route("/users", methods=['GET'])
+@admin_only
 @swag_from('docs/users/users.yml')
 def users():
     '''
@@ -661,10 +656,8 @@ def users():
     '''
     return Response(json.dumps({"ids": pgdb.getUsers()}), status=200,mimetype='application/json')
 
-
-
-@admin_only
 @app.route("/user", methods=['POST'])
+@admin_only
 #@swag_from('docs/users/users.yml')
 def user_id():
     '''
@@ -685,11 +678,8 @@ def user_id():
     pgdb.InsertUser(user_id, user_details)
     return Response(json.dumps({"id": str(user_id)}), status=200, mimetype='application/json')
 
-
-
-
-@admin_only
 @app.route("/user/<userid>", methods=['GET','POST','DELETE'])
+@admin_only
 #@swag_from('docs/users/users.yml')
 def user_id_admin(userid):
     '''
@@ -734,8 +724,10 @@ def get_username():
     '''
     Get user session information
     '''
-    return Response(json.dumps({**_get_attr('uu', session.get('at'), session.get('ats')),
-            **_get_attr('name', session.get('at'), session.get('ats')),
+    at = session_cache.get('uuid')
+    ats = session_cache.get(at)
+    return Response(json.dumps({**_get_attr('uu', at, ats),
+            **_get_attr('name', at, ats),
            }), status=200, mimetype='application/json')
 
 ##################################################
@@ -767,9 +759,8 @@ def types():
     d = {"types" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : tuplo[0]})]} # {"types" : ["Temperatura", "Humidade", "Som"]}
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
-
-@admin_only
 @app.route("/sensor", methods=['POST'])
+@admin_only
 @swag_from('docs/sensors/sensor.yml')
 @csrf.exempt
 def new_sensor():
@@ -838,9 +829,8 @@ def sensor_description(sensorid):
     except:
         return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
 
-
-@admin_only
 @app.route("/sensor/<sensorid>", methods=['POST', 'DELETE'])
+@admin_only
 @swag_from('docs/sensors/sensor_sensorid_post.yml', methods=['POST'])
 @swag_from('docs/sensors/sensor_sensorid_delete.yml', methods=['DELETE'])
 def sensor_description_admin(sensorid):
@@ -895,9 +885,8 @@ def sensor_description_admin(sensorid):
 
     return jsonify(RESP_501), 501
 
-
-@admin_only
 @app.route("/sensor/<sensorid>/key", methods=['GET'])
+@admin_only
 def sensor_key(sensorid):
     try:
         pgdb.isSensorFree(sensorid)
@@ -962,20 +951,12 @@ def sensor_event(sensorid, option):
     return jsonify(RESP_501), 501
 
 
-
-
-
-
-
-
-
-
 ####################################################
 ##              Type Data Methods                 ##
 ####################################################
 
-@admin_only
 @app.route("/type", methods=['POST'])
+@admin_only
 ##@swag_from('docs/sensors/types.yml')
 def new_type():
     if not request.json:
@@ -1008,10 +989,8 @@ def typesFromName(id):
 
     return Response(json.dumps(pgdb.getSensorType(id)), status=200, mimetype='application/json')
 
-    
-
-@admin_only
 @app.route("/type/<id>", methods=['POST', 'DELETE'])
+@admin_only
 ##@swag_from('docs/sensors/types.yml')
 def typesFromName_admin(typename):
 
@@ -1037,27 +1016,20 @@ def typesFromName_admin(typename):
         pgdb.deleteSensorType(id)
         return Response(json.dumps({"id" : id}, status=200, mimetype='application/json'))
 
-
-
-
-
-
-
-
 ####################################################
 ##            Access Control Database             ##
 ####################################################
 
-@admin_only
 @app.route("/accessPolicy", methods=['POST'])
+@admin_only
 def newAccessPolicy():
     response = _access_mgr.create_policy(request)
     if not response[0]:
         return Response(json.dumps({"error_description" : response[1]}, status=400, mimetype='application/json'))
     return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
 
-@admin_only
 @app.route("/accessPolicy/<policyid>", methods=['POST', 'DELETE'])
+@admin_only
 ##@swag_from('docs/sensors/types.yml')
 def accessPolicy(policy_id):
     if request.method == 'POST' :
@@ -1068,8 +1040,8 @@ def accessPolicy(policy_id):
         response = _access_mgr.delete_policy(policy_id)
         return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
 
-@admin_only
 @app.route("/accessPolicies", methods=['GET'])
+@admin_only
 ##@swag_from('docs/sensors/types.yml')
 def getAllAccessPolicies():
     return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')
