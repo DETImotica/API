@@ -380,7 +380,7 @@ class PGDB(object):
     def hasUser(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (id,))
+        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(userid),))
         if cursor.fetchone() == None:
             db_con.close()
             return False
