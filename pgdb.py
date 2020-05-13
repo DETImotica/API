@@ -124,6 +124,16 @@ class PGDB(object):
         db_con.close()
         return True
 
+    def roomNameExists(self, name):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT ID FROM Espaco WHERE Nome = %s;", (name,))
+        if cursor.fetchone() == None:
+            db_con.close()
+            return False
+        db_con.close()
+        return True
+
 
 
 
