@@ -253,7 +253,7 @@ class PGDB(object):
             (str(id),))
 
 
-        l_tuplos = set(cursor.fetchall())
+        l_tuplos = list(set(cursor.fetchall()))
         l_simbolos = [t[1] for t in l_tuplos]
         description = l_tuplos[0][0]
 
