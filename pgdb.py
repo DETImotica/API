@@ -252,8 +252,10 @@ class PGDB(object):
             "SELECT Descricao, Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;",
             (str(id),))
 
-
-        l_tuplos = list(set(cursor.fetchall()))
+        l_tuplos = cursor.fetchall()
+        if not l_tuplos:
+            l_tuplos = cursor.execute("SELECT * FROM TipoSensor WHERE id = %s;", (str(id),))
+        
         l_simbolos = [t[1] for t in l_tuplos]
         description = l_tuplos[0][0]
 
