@@ -249,10 +249,11 @@ class PGDB(object):
         cursor = db_con.cursor()
         ##TODO verificar se esta query funciona como esperado
         cursor.execute(
-            "SELECT DISTINCT Descricao, Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;",
+            "SELECT Descricao, Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;",
             (str(id),))
 
-        l_tuplos = cursor.fetchall()
+
+        l_tuplos = set(cursor.fetchall())
         l_simbolos = [t[1] for t in l_tuplos]
         description = l_tuplos[0][0]
 
