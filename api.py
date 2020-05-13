@@ -253,7 +253,7 @@ def before_req_f():
 #                        r.headers['User'] = fls.get('user')
     elif request.path == "/wsauthverify":
         pass
-    elif request.path != "/spec" and "/docs" not in request.path and "grafana" not in request.path and "auth_callback" not in request.path:
+    elif request.path != "/spec" and "/docs" not in request.path and "grafana" not in request.path and "mobile" not in request.path and "auth_callback" not in request.path:
         print((session.get('user'), session.get('uuid')))
         if not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
             return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
