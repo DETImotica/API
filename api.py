@@ -38,6 +38,7 @@ from datadb import DataDB
 from pgdb import PGDB
 
 from api_grafana import grafana
+from api_mobile import mobile
 
 class ArgumentException(ValueError):
     pass
@@ -53,6 +54,7 @@ _SUPPORTED_SCOPES = ['uu', 'name',
 # Flask global vars
 app = Flask(__name__)
 app.register_blueprint(grafana)
+app.register_blueprint(mobile)
 app.config['JSON_SORT_KEYS'] = False
 app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = False
