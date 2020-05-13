@@ -375,6 +375,15 @@ class PGDB(object):
         db_con.close()
         return id
 
+    def hasUser(self, userid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),))
+        if cursor.fetchone() == None:
+            db_con.close()
+            return False
+        db_con.close()
+        return True
 
     def changeUserAdmin(self, userid, admin_state):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
