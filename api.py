@@ -369,7 +369,7 @@ def auth_callback():
 
     # add user if it doesn't exist.
     if (not pgdb.hasUser(uu['iupi'])):
-        pgdb.addUser(uu['iupi'], uu['email'], False)
+        pgdb.insertUser(uu['iupi'], uu['email'], False)
     
     if 'app' in session and session['app'] == _gkid:
         #expiry_epoch = int(datetime.utcnow().timestamp()) + _graf_lnk_expiry_s
@@ -686,7 +686,7 @@ def user_id():
     #     return Response(json.dumps({"error_description": "User Email already exists"}), status=400, mimetype='application/json')
 
     user_id = uuid.uuid4()
-    pgdb.InsertUser(user_id, user_details)
+    pgdb.insertUser(user_id, user_details["email"], user_details["admin"])
     return Response(json.dumps({"id": str(user_id)}), status=200, mimetype='application/json')
 
 @app.route("/user/<userid>", methods=['GET','POST','DELETE'])
@@ -1012,10 +1012,10 @@ def typesFromName_admin(id):
 
         details = request.json #{"name" : "", description" : ""}
 
-        if ("name" in details) and len(details["name"] > 50):
+        if ("name" in details) and len(details["name"]) > 50:
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-        if ("description" in details) and len(details["description"] > 50):
+        if ("description" in details) and len(details["description"]) > 50:
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
         if pgdb.datatypeNameExists(details["name"]) :

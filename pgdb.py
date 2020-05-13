@@ -249,7 +249,7 @@ class PGDB(object):
         cursor = db_con.cursor()
         ##TODO verificar se esta query funciona como esperado
         cursor.execute(
-            "SELECT Nome, Descricao, Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;",
+            "SELECT Nome, X.Descricao, Simbolo FROM (SELECT Nome, Descricao FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;",
             (str(id),))
 
         l_tuplos = cursor.fetchall()
@@ -369,10 +369,10 @@ class PGDB(object):
 
 
     #TODO pode rebentar
-    def InsertUser(self, userid, userdata):
+    def insertUser(self, userid, email, admin=False):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        id = cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s); RETURNING id", (str(userid), userdata["email"], userdata["admin"]))
+        id = cursor.execute("INSERT INTO Utilizador VALUES (%s, %s, %s); RETURNING id;", (str(userid), email, str(admin)))
         db_con.commit()
         db_con.close()
         return id
@@ -380,7 +380,7 @@ class PGDB(object):
     def hasUser(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (str(id),))
+        cursor.execute("SELECT * FROM Utilizador WHERE uuid = %s;", (id,))
         if cursor.fetchone() == None:
             db_con.close()
             return False
@@ -405,7 +405,7 @@ class PGDB(object):
     def isAdmin(self, userid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execute("SELECT admin FROM Utilizador WHERE uuid = %s;", (userid,))
+        cursor.execute("SELECT admin FROM Utilizador WHERE uuid = %s;", (str(userid),))
         res = cursor.fetchone()
         if not res:
             return False
