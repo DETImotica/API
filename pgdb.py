@@ -249,22 +249,22 @@ class PGDB(object):
         cursor = db_con.cursor()
         ##TODO verificar se esta query funciona como esperado
         cursor.execute(
-            "SELECT Descricao, Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;",
+            "SELECT Nome, Descricao, Simbolo FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON X.Nome = Nome_TipoSensor;",
             (str(id),))
 
         l_tuplos = cursor.fetchall()
         if not l_tuplos:
-            cursor.execute("SELECT * FROM TipoSensor WHERE id = %s;", (str(id),))
+            cursor.execute("SELECT Nome, Descricao FROM TipoSensor WHERE id = %s;", (str(id),))
             l_tuplos = cursor.fetchall()
             l_simbolos = []
         else:
-            l_simbolos = [t[1] for t in l_tuplos]
+            l_simbolos = [t[2] for t in l_tuplos]
         
-        description = l_tuplos[0][0]
-        name = l_tuplos[0][1]
+        description = l_tuplos[0][1]
+        name = l_tuplos[0][0]
 
         db_con.close()
-        return {"description": description, "name": name, "units": l_simbolos}
+        return {"name": name, "description": description, "units": l_simbolos}
 
 
 
