@@ -818,11 +818,11 @@ def new_sensor():
     if not _pdp.get_http_req_access(request, user_attrs, {'room' : details['room_id']}):
         return Response(json.dumps({"error description": f"Access denied: you can't add a new sensor to room {details['room_id']}."}), status=401, mimetype='application/json')
         
-    # url = "http://iot.av.it.pt/device/standalone"
-    # data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
-    # response = requests.post(url, headers={"Content-Type": "application/json"}, auth=("detimotic", "<pass>"), data=json.dumps(data_influx))
-    # if response.status_code == 409:
-    #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
+    url = "http://iot.av.it.pt/device/standalone"
+    data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
+    response = requests.post(url, headers={"Content-Type": "application/json"}, auth=("detimotic", "<pass>"), data=json.dumps(data_influx))
+    if response.status_code == 409:
+        return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
     pgdb.createSensor(id, details)
     sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + str(id), _aes_gw_salt, 16, int(_gw_kdf_iter), None)).decode('utf-8')
@@ -1021,7 +1021,7 @@ def typesFromName_admin(id):
         if ("description" in details) and len(details["description"]) > 50:
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-        if pgdb.datatypeNameExists(details["name"]) :
+        if pgdb.getSensorType(id)["name"] != details["name"] and pgdb.datatypeNameExists(details["name"]) :
             return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
 
         pgdb.updateSensorType(id, details)
