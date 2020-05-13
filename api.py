@@ -55,6 +55,7 @@ _SUPPORTED_SCOPES = ['uu', 'name',
 app = Flask(__name__)
 app.register_blueprint(grafana)
 app.register_blueprint(mobile)
+
 app.config['JSON_SORT_KEYS'] = False
 app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = False
@@ -87,6 +88,7 @@ app.config['SWAGGER'] = {
 
 csrf = CSRFProtect(app)
 csrf.exempt(grafana)
+csrf.exempt(mobile)
 
 paranoid = Paranoid(app)
 paranoid.redirect_view = "/"
