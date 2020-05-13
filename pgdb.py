@@ -168,7 +168,7 @@ class PGDB(object):
         if "room_id" not in sensordata:
             sensordata["room_id"] = "Null"
 
-        cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, '%s');", (str(sensorid), sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
+        cursor.execute("INSERT INTO Sensor VALUES (%s, %s, %s, %s, %s);", (str(sensorid), sensordata["description"], sensordata["data"]["type"], sensordata["data"]["unit_symbol"], sensordata["room_id"]))
         db_con.commit()
         db_con.close()
 
