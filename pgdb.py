@@ -255,8 +255,10 @@ class PGDB(object):
         l_tuplos = cursor.fetchall()
         if not l_tuplos:
             l_tuplos = cursor.execute("SELECT * FROM TipoSensor WHERE id = %s;", (str(id),))
+            l_simbolos = []
+        else:
+            l_simbolos = [t[1] for t in l_tuplos]
         
-        l_simbolos = [t[1] for t in l_tuplos]
         description = l_tuplos[0][0]
 
         db_con.close()
