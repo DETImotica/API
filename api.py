@@ -499,6 +499,9 @@ def newroom():
     if len(details["name"])>50 or ("description" in details and len(details["description"])>50) :
         return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
+    if "sensors" not in details:
+        details["sensors"] = []
+
     #Dois arrays para guardar os sensores que não existem e o aqueles que já estão atribuidos a uma sala
     error = {"non_existent": [], "non_free": [], "error_description": "Some of the sensors does not exist or are not free"}
 
