@@ -499,6 +499,9 @@ def newroom():
     if len(details["name"])>50 or ("description" in details and len(details["description"])>50) :
         return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
+    if "sensors" not in details:
+        details["sensors"] = []
+
     #Dois arrays para guardar os sensores que não existem e o aqueles que já estão atribuidos a uma sala
     error = {"non_existent": [], "non_free": [], "error_description": "Some of the sensors does not exist or are not free"}
 
@@ -822,7 +825,7 @@ def new_sensor():
     #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
     pgdb.createSensor(id, details)
-    sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + id, _aes_gw_salt, 16, _gw_kdf_iter, None)).decode('utf-8')
+    sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + id, _aes_gw_salt, 16, int(_gw_kdf_iter), None)).decode('utf-8')
     return Response(json.dumps({"id": id, "key": sensor_key}), status=200, mimetype='application/json')
 
 
