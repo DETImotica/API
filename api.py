@@ -113,7 +113,7 @@ _gkid = config['info']['grafana_id']
 
 _aes_gw_salt = config['info']['gw_secret_salt']
 _aes_gw_key = config['info']['gw_secret_key']
-_gw_kdf_iter = config['info']['gw_kdf_iterations']
+_gw_kdf_iter = int(config['info']['gw_kdf_iterations'])
 
 pgdb = PGDB()
 influxdb = DataDB()
@@ -517,7 +517,7 @@ def newroom():
         return Response(json.dumps(error), status=400, mimetype='application/json')
 
     pgdb.createRoom(id, {"name":details["name"], "description":details["description"]}, details["sensors"])
-    return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
+    return Response(json.dumps({"id": str(id)}), status=200, mimetype='application/json')
 
 
 @app.route("/room/<roomid>", methods=['GET'])
