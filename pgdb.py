@@ -261,9 +261,10 @@ class PGDB(object):
             l_simbolos = [t[1] for t in l_tuplos]
         
         description = l_tuplos[0][0]
+        name = l_tuplos[0][1]
 
         db_con.close()
-        return {"description": description, "units": l_simbolos}
+        return {"description": description, "name": name, "units": l_simbolos}
 
 
 
