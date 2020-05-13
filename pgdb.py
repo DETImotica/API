@@ -326,7 +326,6 @@ class PGDB(object):
     def getSensorsFromType(self, id):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
-        cursor.execture("")
         cursor.execute(
             "SELECT Sensor.id FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON Nome_TipoSensor = X.Nome;",
             (str(id),))
@@ -336,10 +335,6 @@ class PGDB(object):
         if l_tuplos == None:
             return []
         return [t[0] for t in l_tuplos]
-
-
-
-
 
     ##################################################
     ##                  USER METHODS              ###
