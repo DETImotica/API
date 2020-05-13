@@ -54,7 +54,7 @@ def mobile_notifications ():
             secret= json.load(json_file)
     except:
         # Webhook handle is ok, notifcation is not sent
-        Response(json.dumps({"error_description" : "Could not open or locate config file"}), status=500, mimetype='application/json')
+        return Response(json.dumps({"error_description" : "Could not open or locate config file"}), status=500, mimetype='application/json')
 
     #Message Payload
     headers = {
@@ -73,6 +73,6 @@ def mobile_notifications ():
     response = requests.post("https://fcm.googleapis.com/fcm/send",headers = headers, data=json.dumps(body))
     
     if response.status_code == 200:
-        Response(json.dumps({}), status=200, mimetype='application/json')   
+        return Response(json.dumps({}), status=200, mimetype='application/json')   
     else:
-         Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
+        return Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
