@@ -822,7 +822,7 @@ def new_sensor():
     #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
 
     pgdb.createSensor(id, details)
-    sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + id, _aes_gw_salt, 16, _gw_kdf_iter, None)).decode('utf-8')
+    sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + id, _aes_gw_salt, 16, int(_gw_kdf_iter), None)).decode('utf-8')
     return Response(json.dumps({"id": id, "key": sensor_key}), status=200, mimetype='application/json')
 
 
