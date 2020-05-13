@@ -73,6 +73,6 @@ def mobile_notifications ():
     response = requests.post("https://fcm.googleapis.com/fcm/send",headers = headers, data=json.dumps(body))
     
     if response.status_code == 200:
-        return Response(json.dumps({}), status=200, mimetype='application/json')   
+        Response(json.dumps({}), status=200, mimetype='application/json')   
     else:
-        return Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
+         Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
