@@ -496,6 +496,9 @@ def newroom():
     if "name" not in details:
         return Response(json.dumps({"error_description" : "Room details incomplete"}), status=400, mimetype='application/json')
 
+    if pgdb.roomNameExists(details["name"]):
+        return Response(json.dumps({"error_description": "Room name already exists"}), status=400, mimetype='application/json')
+
     if len(details["name"])>50 or ("description" in details and len(details["description"])>50) :
         return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
@@ -561,6 +564,9 @@ def room_id_admin(roomid):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
         if ("description" in new_details and len(new_details["description"])>50):
             return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+        if ("name" in new_details and pgdb.getRoom(roomid)["name"] != new_details["name"] and pgdb.roomNameExists(new_details["name"])):
+            return Response(json.dumps({"error_description": "The new name already exists"}), status=400, mimetype='application/json')
 
         pgdb.updateRoom(roomid, new_details)
         return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
@@ -1021,7 +1027,7 @@ def typesFromName_admin(id):
         if ("description" in details) and len(details["description"]) > 50:
             return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-        if pgdb.getSensorType(id)["name"] != details["name"] and pgdb.datatypeNameExists(details["name"]) :
+        if "name" in details and pgdb.getSensorType(id)["name"] != details["name"] and pgdb.datatypeNameExists(details["name"]) :
             return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
 
         pgdb.updateSensorType(id, details)
