@@ -1029,7 +1029,7 @@ def typesFromName_admin(id):
             return Response(json.dumps({"error_description" : "Cannot remove a sensor type that has at least one sensor"}, status=400, mimetype='application/json'))
 
         pgdb.deleteSensorType(id)
-        return Response(json.dumps({"id" : id}, status=200, mimetype='application/json'))
+        return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
 
 ####################################################
 ##            Access Control Database             ##
