@@ -831,12 +831,13 @@ def new_sensor():
     
     if not _pdp.get_http_req_access(request, user_attrs, {'room' : details['room_id']}):
         return Response(json.dumps({"error description": f"Access denied: you can't add a new sensor to room {details['room_id']}."}), status=401, mimetype='application/json')
-        
-    url = "http://iot.av.it.pt/device/standalone"
-    data_influx = {"tenant-id": "detimotic", "device-id" : str(id), "password": _hono_register_pw}
-    response = requests.post(url, headers={"Content-Type": "application/json"}, auth=(_hono_user_name, _hono_user_pw), data=json.dumps(data_influx))
-    if response.status_code == 409:
-        return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
+
+    try:
+        url = "http://iot.av.it.pt/device/standalone"
+        data_influx = {"tenant-id": "detimotic", "device-id" : str(id), "password": _hono_register_pw}
+        response = requests.post(url, headers={"Content-Type": "application/json"}, auth=(_hono_user_name, _hono_user_pw), timeout=5, data=json.dumps(data_influx))
+    except:
+        return Response(json.dumps({"error_description": "Connection to influx timeout"}), status=408, mimetype='application/json')
 
     pgdb.createSensor(id, details)
     sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + str(id), _aes_gw_salt, 16, int(_gw_kdf_iter), None)).decode('utf-8')
