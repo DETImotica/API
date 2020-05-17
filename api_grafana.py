@@ -63,17 +63,17 @@ def graf_query():
             # Alerts (range example: ['5m', 'now'])
             if len((req['range']['to']).split('-')) > 1:
                 if 'm' in (req['range']['to']).split('-')[1]:
-                    time_end= datetime.utcnow()-timedelta(minutes= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
+                    time_end= datetime.utcnow()-timedelta(minutes= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
                 elif 'h' in (req['range']['to']).split('-')[1]:
-                    time_end= datetime.utcnow()-timedelta(hours= int(re.findall('\d+',(req['range']['to']).split('-')[1])[0]))
+                    time_end= datetime.utcnow()-timedelta(hours= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
                 else:
                     return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
             else:
                 time_end= datetime.utcnow()
             if 'm' in req['range']['from']:
-                time_st= time_end-timedelta(minutes= int(re.findall('\d+',req['range']['from'])[0]))
+                time_st= time_end-timedelta(minutes= int(re.findall(r'\d+',req['range']['from'])[0]))
             elif 'h' in req['range']['from']:
-                time_st= time_end-timedelta(hours= int(re.findall('\d+',req['range']['from'])[0]))
+                time_st= time_end-timedelta(hours= int(re.findall(r'\d+',req['range']['from'])[0]))
             else:
                 return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
         try:

@@ -83,8 +83,8 @@ class ABAC(object):
             hms = [int(v) for v in time.split(':')]
             if 0 <= hms[0] < 24 and 0 <= hms[1] < 60 and 0 <= hms[2] < 60:
                 return 3600*hms[0] + 60*hms[1] + hms[2]
-        else:
-            raise ValueError("Time must be a string in 24h format (e.g. hh:mm:ss)")
+            else:
+                raise ValueError("Time must be a string in 24h format (e.g. hh:mm:ss)")
         raise ValueError("Incorrect timestamp")
 
     @staticmethod
@@ -113,11 +113,34 @@ class PolicyManager(ABAC):
 
     def get_policies(self):
         '''PAP - get policies by given request attributes.'''
-        stored_policies = self._storage.retrieve_all()
-        set_policies = []
-        for p in stored_policies:
-            set_policies.append(p.to_json())
-        return set_policies
+        return [p.to_json() for p in self._storage.retrieve_all()]
+
+    def get_policy(self, req):
+        
+        if not req.data:
+           return False, "ERROR: request body is empty"
+
+        # load JSON body
+        try:
+           req_json = req.json
+        except:
+           return False, "ERROR: malformed JSON - syntax error"
+
+        context = req_json['context'] if 'context' in req_json else None
+
+        if context:
+            if 'hour' in context:
+                context['hour'] = ABAC.daytime_in_s(context['hour'])
+            if 'date' in context:
+                context['date'] = ABAC.unix_timestamp(context['date'])
+
+        inq = Inquiry(subject=req_json['subject'] if 'subject' in req_json else None,
+                      action=req_json['action'] if 'action' in req_json else None,
+                      resource=req_json['resource'] if 'resource' in req_json else None,
+                      context=context
+                    )
+
+        return [p.to_json() for p in self._storage.find_for_inquiry(inq, checker=RulesChecker())]
 
     def create_policy(self, req):
         '''Creates a policy based on the JSON-type request body and stores it onto the PRP.'''
@@ -138,7 +161,7 @@ class PolicyManager(ABAC):
             if type(req_json['subjects']) is not list:
                 return False, "ERROR: malformed access JSON - 'subjects' must be a list."
 
-            subject = [{k : (rules.Eq(s[k]) if k != 'admin' else rules.Truthy())} for s in req_json['subjects'] for k in s]
+            subject = [{k : rules.Eq(s[k]) if k != 'admin' else (rules.Truthy() if s['admin'].lower() == 'true' else rules.Falsy())} for s in req_json['subjects'] for k in s]
             if not subject:
                 return False, "ERROR: malformed access JSON - 'subjects' has no value defined."
             ####
@@ -147,8 +170,9 @@ class PolicyManager(ABAC):
             if type(req_json['actions']) is not list:
                 return False, "ERROR: malformed access JSON - 'actions' must be a list."
 
+            print(type(req_json))
             action = [rules.Any()]
-            if ['actions'] in req_json:
+            if 'actions' in req_json:
                 action = [rules.Eq(a) for a in req_json['actions']]
 
             ####
@@ -171,7 +195,7 @@ class PolicyManager(ABAC):
                                                    rules.LessOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['end']))
                                                   )
                         else:
-                            return "ERROR: Malformed access JSON - 'context':'hours' needs attribute 'start' and 'end'!"
+                            return "ERROR: Malformed access JSON - 'context':'hours' needs 'start' and 'end' attributes!"
                     elif k == 'date':
                         if 'from' in context['date'] and 'until' in context['date']:
                             context['date'] = rules.And(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date'])),
@@ -241,8 +265,6 @@ class PolicyManager(ABAC):
         self._storage.add(inicial_policy.from_json())
         return True
 
-        #return False, "Not implemented"
-
     def delete_policy(self, id):
         '''Deletes a policy from the PRP, given UUID4-type ID.'''
         self._storage.delete(id)
@@ -274,12 +296,14 @@ class PDP(ABAC):
         resource_path = req.path.split("/")
 
         resource = {}
-        if resource_path[1] in ['rooms', 'types', 'sensor', 'newroom']:
+        if resource_path[1] in ['rooms', 'types', 'sensors']:
             if opt_resource:
                 resource.update(opt_resource)
             else:
                 return False
-        if resource_path[1] == 'room':
+        if resource_path[1] == 'type':
+            resource.update({resource_path[1]: resource_path[2]})
+        elif resource_path[1] == 'room':
             resource.update({resource_path[1]: resource_path[2]})
         elif resource_path[1] == 'sensor':
             if len(resource_path) < 3:
@@ -288,7 +312,11 @@ class PDP(ABAC):
                 else:
                     return False
             else:
-                resource.update({resource_path[1]: resource_path[2]})
+                # get the respective sensor's room and type attributes alongside its id
+                sensor_type = (self._pgdb.getSensorType(resource_path[2]))['data']['type']
+                sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
+
+                resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
                 details = self._pgdb.getSensor(resource_path[2])
                 resource.update({'type': details['data']['type']})
             

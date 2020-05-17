@@ -418,7 +418,6 @@ def logout():
     print(session.get('user'))
     print(session.get('uuid'))
     
-    user = session.get('user')
     uuid = session.get('uuid')
 
     at = session_cache.get(uuid)
@@ -1068,11 +1067,11 @@ def newAccessPolicy():
 ##@swag_from('docs/sensors/types.yml')
 def accessPolicy(policy_id):
     if request.method == 'POST' :
-        response = _access_mgr.update_policy(policy_id)
+        _access_mgr.update_policy(policy_id)
         return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
         
     if request.method == 'DELETE' :
-        response = _access_mgr.delete_policy(policy_id)
+        _access_mgr.delete_policy(policy_id)
         return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
 
 @app.route("/accessPolicies", methods=['GET'])
