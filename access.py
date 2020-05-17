@@ -80,12 +80,16 @@ class ABAC(object):
     @staticmethod
     def daytime_in_s(time='00:00:00'):
         if type(time) is str:
-            hms = [int(v) for v in time.split(':')]
+            try:
+                hms = [int(v) for v in time.split(':')]
+            except (ValueError, IndexError):
+                raise ValueError("'time' must be a string in 24h format (e.g. hh:mm:ss)")
+        
             if 0 <= hms[0] < 24 and 0 <= hms[1] < 60 and 0 <= hms[2] < 60:
                 return 3600*hms[0] + 60*hms[1] + hms[2]
             else:
-                raise ValueError("Time must be a string in 24h format (e.g. hh:mm:ss)")
-        raise ValueError("Incorrect timestamp")
+                raise ValueError("'time' must be a string in 24h format (e.g. hh:mm:ss)")
+        raise ValueError("'time' given must be in string format")
 
     @staticmethod
     def unix_timestamp(timestamp):
