@@ -317,12 +317,13 @@ class PDP(ABAC):
                     return False
             else:
                 # get the respective sensor's room and type attributes alongside its id
-                sensor_type = (self._pgdb.getSensorType(resource_path[2]))['data']['type']
-                sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
+                # sensor_type = (self._pgdb.getSensorType(resource_path[2]))['data']['type']
+                # sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
 
-                resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
-                details = self._pgdb.getSensor(resource_path[2])
-                resource.update({'type': details['data']['type']})
+                #resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
+                resource.update({resource_path[1]: resource_path[2]})
+                #details = self._pgdb.getSensor(resource_path[2])
+                #resource.update({'type': details['data']['type']})
             
             if len(resource_path) > 3 and resource_path[3] == 'measure':
                 resource.update({resource_path[3]: resource_path[4]})
