@@ -39,11 +39,13 @@ responses:
         id:
           $ref: "#/definitions/uuid"
   '400':
-    enum: ["Room details incomplete", "One of the detail fields has more than 50 characters"]
+    enum: ["Room details incomplete", "One of the detail fields has more than 50 characters, Empty JSON or Empty Body, Room name already exists"]
     description: >
       Returns an error description in this list:
         * Room details incomplete
         * One of the detail fields has more than 50 characters
+        * Empty JSON or Empty Body
+        * Room name already exists
     schema:
       error_description: error_details_message
       properties:

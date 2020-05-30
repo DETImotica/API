@@ -1,0 +1,31 @@
+Get a List with all the info from the users
+---
+tags:
+- Users
+produces:
+- application/json
+responses:
+  '200':
+    description: Returns a list of the data from the users
+    schema:
+      properties:
+        sensors:
+          type: array
+          items:
+            properties:
+              id:
+                $ref: "#/definitions/uuid"
+              email:
+                type: string
+                example: 'Teste@ua.pt'
+              admin:
+                type: string
+                example: 'True'
+  '401':
+    description: Returns an error as the only admins can get all the users data
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to the users 

@@ -34,7 +34,12 @@ responses:
         id:
           $ref: "#/definitions/uuid"
   '400':
-    description: Returns an error, as the details fields are malformed 
+    enum: ["Empty JSON or empty body", "One of the detail fields has more than 50 characters, The new name already exists"]
+    description: >
+      Returns an error description in this list:
+        * One of the detail fields has more than 50 characters
+        * Empty JSON or Empty Body
+        * The new name already exists
     schema:
       error_description: error_details_message
       properties:

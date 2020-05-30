@@ -51,11 +51,11 @@ responses:
         error_description:
           type: string
           example: The sensor type does not exist
-  '409':
-    description: Returns an error, as the sensor already exist in Hono
+  '408':
+    description: Returns an error, as the connection was not made
     schema:
       error_description: error_details_message
       properties:
         error_description:
           type: string
-          example: The Sensor already exists
+          example: Connection to influx timeout
