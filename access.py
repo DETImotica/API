@@ -185,7 +185,7 @@ class PolicyManager(ABAC):
             ####
             # 'context' is not mandatory, defaults to empty
             ####
-            context = {}
+            context = {"ip": rules.Any(), "hour": rules.Any(), "date": rules.Any()}
             if 'context' in req_json:
                 for k in req_json['context']:
                     if k == 'hour':
