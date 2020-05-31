@@ -55,6 +55,17 @@ definitions:
           example: Permitir que um docente que lecione PEI possa ler ou modificar atributos do sensor 144f das 8h30 às 18h30 dentro da UA
 produces:
 - application/json
+parameters:
+  - in: "body"
+    name: "body"
+    required: false
+    description: "(Not Required)\nWhen a filter is sent in the body, the returned policies can be selected.\n
+                A filter is a json with this format {'key' : 'resource_id'}, the 'key' can take the values ['resources.room', 'resources.sensor', 'resources.type']"
+    properties:
+      resources.room:
+        $ref: '#/definitions/policy_rule'
+
+      
 responses:
   '200':
     description: Returns a list of the policies of all existing resources
@@ -64,3 +75,11 @@ responses:
           type: array
           items:
             $ref: "#/definitions/policy_rule"
+  '401':
+    description: Returns an error, as this endpoint is only available for admins
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint

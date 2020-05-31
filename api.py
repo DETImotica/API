@@ -404,6 +404,21 @@ def room_id(roomid):
 def teste():
     return
 
+@app.route("/accessPolicy", methods=['POST'])
+@swag_from('docs/access/policy.yml', methods=['POST'])
+def teste2():
+    return
+
+@app.route("/accessPolicy/<id>", methods=['POST'])
+@swag_from('docs/access/updatePolicy.yml', methods=['POST'])
+def teste3(id):
+    return
+
+@app.route("/accessPolicies/<id>", methods=['DELETE'])
+@swag_from('docs/access/deletePolicy.yml', methods=['DELETE'])
+def teste4(id):
+    return
+
 @app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
 @swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
 @swag_from('docs/rooms/room_sensors_post.yml', methods=['POST'])
