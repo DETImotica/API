@@ -233,6 +233,7 @@ class PolicyManager(ABAC):
 
         # add uid to JSON
         uid = str(uuid4())
+        req_json.update({'uid': uid})
         
         self._raw_policy_collection.insert_one(req_json)
         self._storage.add(Policy(uid,
