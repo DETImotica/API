@@ -256,7 +256,7 @@ class PGDB(object):
         cursor = db_con.cursor()
 
         cursor.execute(
-            "SELECT DISTINCT Tipo_Sensor.id FROM Sensor JOIN TipoSensor ON Sensor.Nome_Tiposensor = Tipo_Sensor.Nome WHERE Sensor.id = %s;",
+            "SELECT DISTINCT TipoSensor.id FROM Sensor JOIN TipoSensor ON Sensor.Nome_TipoSensor = TipoSensor.Nome WHERE Sensor.id = %s;",
             (str(id),))
 
         type_sensor = cursor.fetchone()
