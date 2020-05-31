@@ -399,8 +399,10 @@ def room_id(roomid):
     return jsonify(RESP_501), 501
 
 
-
-
+@app.route("/accessPolicies", methods=['GET'])
+@swag_from('docs/access/policies.yml', methods=['GET'])
+def teste():
+    return
 
 @app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
 @swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
