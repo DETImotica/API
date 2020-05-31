@@ -305,8 +305,6 @@ class PDP(ABAC):
             return False
 
         subject_data.update({'admin': self._pgdb.isAdmin(subject_data['iupi'])})
-        subject_data['student'] = (subject_data['student'].lower() == "true")
-        subject_data['teacher'] = (subject_data['teacher'].lower() == "true")
 
         resource_path = req.path.split("/")
 
