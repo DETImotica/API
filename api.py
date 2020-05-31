@@ -1077,11 +1077,11 @@ def newAccessPolicy():
 @swag_from('docs/access/deletePolicy.yml', methods=['DELETE'])
 def accessPolicy(policyid):
     if request.method == 'POST' :
-        _access_mgr.update_policy(policy_id)
+        _access_mgr.update_policy(policyid)
         return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
         
     if request.method == 'DELETE' :
-        _access_mgr.delete_policy(policy_id)
+        _access_mgr.delete_policy(policyid)
         return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
 
 @app.route("/accessPolicies", methods=['GET'])
