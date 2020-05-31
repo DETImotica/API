@@ -177,7 +177,7 @@ class PolicyManager(ABAC):
             # 'resource' is not mandatory, defaults to any element
             ####
             resource = [rules.Any()]
-            if 'resource' in req_json:
+            if 'resources' in req_json:
                 if type(req_json['resources']) is not list:
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
                 resource = [{k : rules.Eq(s[k])} for s in req_json['resources'] for k in s]
