@@ -167,7 +167,7 @@ class PolicyManager(ABAC):
             # 'actions' value has to be a json list, although not mandatory
             ####
 
-            action = [rules.Any()]
+            action = [{'email': rules.Any()}]
             if 'actions' in req_json:
                 if type(req_json['actions']) is not list:
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
@@ -343,7 +343,8 @@ class PDP(ABAC):
         inq = Inquiry(subject=subject_data,
                       action=req.method,
                       resource=resource,
-                      context={'ip': req.headers['X-Forwarded-For'].split(',')[0].strip(), 'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
+                      context={'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
+                      #context={'ip': req.headers['X-Forwarded-For'].split(',')[0].strip(), 'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
                     )
 
         print(inq.to_json())
