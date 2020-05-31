@@ -1075,7 +1075,7 @@ def newAccessPolicy():
 @csrf.exempt
 @swag_from('docs/access/updatePolicy.yml', methods=['POST'])
 @swag_from('docs/access/deletePolicy.yml', methods=['DELETE'])
-def accessPolicy(policy_id):
+def accessPolicy(policyid):
     if request.method == 'POST' :
         _access_mgr.update_policy(policy_id)
         return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
