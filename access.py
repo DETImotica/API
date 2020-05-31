@@ -331,7 +331,7 @@ class PDP(ABAC):
                     return False
             else:
                 # get the respective sensor's room and type attributes alongside its id
-                sensor_type = (self._pgdb.getSensorTypeID(resource_path[2]))['id']
+                sensor_type = str(self._pgdb.getSensorTypeID(resource_path[2]))
                 sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
 
                 resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
