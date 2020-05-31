@@ -1072,7 +1072,7 @@ def typesFromName_admin(id):
 def newAccessPolicy():
     response = _access_mgr.create_policy(request)
     if not response[0]:
-        return Response(json.dumps({"error_description" : response[1]}, status=400, mimetype='application/json'))
+        return Response(json.dumps({"error_description" : response[1]}), status=400, mimetype='application/json')
     return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
 
 @app.route("/accessPolicy/<policyid>", methods=['POST', 'DELETE'])
