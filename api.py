@@ -277,7 +277,7 @@ def after_req(response):
     h['Access-Control-Allow-Methods'] = '*'
     h['Access-Control-Allow-Headers'] = '*'
 
-    print(response.get_data())
+    #print(response.get_data())
     return response
 
 @app.route("/", methods=['GET', 'HEAD'])
