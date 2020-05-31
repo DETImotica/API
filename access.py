@@ -106,7 +106,7 @@ class PolicyManager(ABAC):
 
     def __init__(self):
         super(PolicyManager, self).__init__()
-        if self._raw_policy_collection.estimated_document_count() < 1 and self._storage.retrieve_all().count < 1:
+        if self._raw_policy_collection.estimated_document_count() < 1 and len(list(self._storage.retrieve_all())) < 1:
             admin_pol = {'subjects': [{'admin': 'true'}], 'description': '[DEFAULT] All admins have full access to the system'}
             self.create_policy(admin_pol, internal=True)
 
@@ -119,7 +119,7 @@ class PolicyManager(ABAC):
     def get_policies(self, req=None):
         '''PAP - get policies by given request attributes.'''
         if not req:
-            return [p for p in self._raw_policy_collection.find()]
+            return [p for p in self._raw_policy_collection.find(projection={'_id': False})]
 
         # load JSON body
         try:
@@ -127,7 +127,7 @@ class PolicyManager(ABAC):
         except:
            return False, "ERROR: malformed JSON - syntax error"
 
-        return [p for p in self._raw_policy_collection.find(req_json)]
+        return [p for p in self._raw_policy_collection.find(req_json, projection={'_id': False})]
 
     def create_policy(self, req, internal=False):
         # '''Creates a policy based on the JSON-type request body and stores it onto the PRP.'''
@@ -331,7 +331,7 @@ class PDP(ABAC):
                     return False
             else:
                 # get the respective sensor's room and type attributes alongside its id
-                sensor_type = (self._pgdb.getSensorTypeID(resource_path[2]))['id']
+                sensor_type = str(self._pgdb.getSensorTypeID(resource_path[2]))
                 sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
 
                 resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
