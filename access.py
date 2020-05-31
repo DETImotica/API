@@ -119,7 +119,7 @@ class PolicyManager(ABAC):
     def get_policies(self, req=None):
         '''PAP - get policies by given request attributes.'''
         if not req:
-            return [p for p in self._raw_policy_collection.find()]
+            return [p for p in self._raw_policy_collection.find(projection={'_id': False})]
 
         # load JSON body
         try:
@@ -127,7 +127,7 @@ class PolicyManager(ABAC):
         except:
            return False, "ERROR: malformed JSON - syntax error"
 
-        return [p for p in self._raw_policy_collection.find(req_json)]
+        return [p for p in self._raw_policy_collection.find(req_json, projection={'_id': False})]
 
     def create_policy(self, req, internal=False):
         # '''Creates a policy based on the JSON-type request body and stores it onto the PRP.'''
