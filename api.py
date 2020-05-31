@@ -1096,7 +1096,9 @@ def accessPolicy(policy_id):
 @admin_only
 ##@swag_from('docs/sensors/types.yml')
 def getAllAccessPolicies():
-    return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')
+    if not request.json:
+        return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')
+    return Response(json.dumps(_access_mgr.get_policies(request)), status=200, mimetype='application/json')
 
 if __name__ == "__main__":
     try:
