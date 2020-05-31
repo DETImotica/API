@@ -1068,7 +1068,7 @@ def newAccessPolicy():
     response = _access_mgr.create_policy(request)
     if not response[0]:
         return Response(json.dumps({"error_description" : response[1]}), status=400, mimetype='application/json')
-    return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
+    return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
 
 @app.route("/accessPolicy/<policyid>", methods=['POST', 'DELETE'])
 @admin_only
@@ -1078,11 +1078,11 @@ def newAccessPolicy():
 def accessPolicy(policy_id):
     if request.method == 'POST' :
         _access_mgr.update_policy(policy_id)
-        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
+        return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
         
     if request.method == 'DELETE' :
         _access_mgr.delete_policy(policy_id)
-        return Response(json.dumps({"response" : "OK"}, status=200, mimetype='application/json'))
+        return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
 
 @app.route("/accessPolicies", methods=['GET'])
 @admin_only
