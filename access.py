@@ -106,7 +106,7 @@ class PolicyManager(ABAC):
 
     def __init__(self):
         super(PolicyManager, self).__init__()
-        if self._raw_policy_collection.estimated_document_count() < 1 and self._storage.retrieve_all().count() < 1:
+        if self._raw_policy_collection.estimated_document_count() < 1 and len(self._storage.retrieve_all()) < 1:
             admin_pol = {'subjects': [{'admin': 'true'}], 'description': '[DEFAULT] All admins have full access to the system'}
             self.create_policy(admin_pol, internal=True)
 
