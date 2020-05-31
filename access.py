@@ -232,11 +232,7 @@ class PolicyManager(ABAC):
             return False, f"ERROR: malformed policy JSON - invalid '{str(e)}' key."
 
         # add uid to JSON
-        if 'uid' not in req_json:
-            uid = str(uuid4())
-            req_json.update({'uid': uid})
-        else:
-            uid = req_json['uid']
+        uid = str(uuid4())
         
         self._raw_policy_collection.insert_one(req_json)
         self._storage.add(Policy(uid,
@@ -256,10 +252,8 @@ class PolicyManager(ABAC):
 
         uid = details.pop('uid', None)
 
-        new_pol = self._raw_policy_collection.find_one_and_replace({'uid': uid}, details, return_document=ReturnDocument.AFTER)
-
         self.delete_policy(uid)
-        self.create_policy(new_pol, internal=True)
+        self.create_policy(details, internal=True)
 
         # inicial_policy = self._storage.get(details["id"]).to_json()
         # self._storage.delete(details["id"])
