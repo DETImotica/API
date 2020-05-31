@@ -41,7 +41,33 @@ responses:
       properties:
         id:
           $ref: "#/definitions/uuid"
+  '401':
+    description: Returns an error, as the room is not available for the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
   '400':
     description: Either a sensor in the 'add' list doesn't exist or is already in the room or a sensor in the 'delete' list is not in the room
+    schema:
+      add_sensors: sensors ids related to add's
+      rm_sensors: sensors ids related to remove's
+      error_description: error_details_message
+      properties:
+        add_sensors:
+          $ref: "#/definitions/sensors_error_add"
+        rm_sensors:
+          $ref: "#/definitions/sensors_error_rm"
+        error_description:
+          type: string
+          example: Invalid Sensors
   '404':
-    description: The specified room was not found
+    description: Returns an error, as the room id does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The roomid does not exist

@@ -1,27 +1,28 @@
-Delete a given room from the system
+Get User with the id userid of the database
 ---
 tags:
-- Rooms
-consumes:
-- application/x-www-form-urlencoded
+- Users
 produces:
 - application/json
 parameters:
-  - name: roomid
+  - name: userid
     in: path
     type: string
     description: uuid of the desired room
     required: true
 responses:
   '200':
-    description: Returns the id of the room that just deleted
+    description: Returns User's information
     schema:
-      id: room_id
       properties:
-        id:
-          $ref: "#/definitions/uuid"
+        email:
+          type: string
+          example: example@ua.pt
+        admin:
+          type: string
+          example: "false"
   '401':
-    description: Returns an error, as the room is not available for the user
+    description: Returns an error as only admins can get all the users ids
     schema:
       error_description: error_details_message
       properties:
@@ -29,10 +30,10 @@ responses:
           type: string
           example: Access denied, admin only endpoint
   '404':
-    description: Returns an error, as the room id does not exist
+    description: Returns an error, as the user id does not exist
     schema:
       error_description: error_details_message
       properties:
         error_description:
           type: string
-          example: The roomid does not exist
+          example: The userid does not exist

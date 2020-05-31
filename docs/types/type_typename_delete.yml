@@ -1,0 +1,44 @@
+Delete a new sensor type
+---
+tags:
+- Types
+produces:
+- application/json
+parameters:
+  - name: id
+    in: path
+    type: string
+    description: type's id of the sensor type
+    required: true
+responses:
+  '200':
+    description: Returns the name of the deleted type
+    schema:
+      properties:
+        name:
+          type: string
+          example: 'Temperatura'
+  '400':
+    description: Error as is not allow to delete that type 
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Cannot remove a sensor type that has at least one sensor
+  '401':
+    description: Returns an error, as this endpoint is not available
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404': 
+    description: The Type's name does not exist 
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The name type sent does not exist

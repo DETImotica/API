@@ -1,0 +1,52 @@
+Get a List with all the meta-info from the sensors, that exist on a room
+---
+tags:
+- Rooms
+produces:
+- application/json
+parameters:
+  - name: roomid
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+responses:
+  '200':
+    description: Returns a list of the meta data from the sensors
+    schema:
+      properties:
+        sensors:
+          type: array
+          items:
+            properties:
+              id:
+                $ref: "#/definitions/uuid"
+              description:
+                type: string
+                example: 'Proveniente de um Sensor TSL2561, taxa de amostragem de 3 segundos'
+              data:
+                properties:
+                  type:
+                    type: string
+                    example: 'Luminosidade'
+                  unit_symbol:
+                    type: string
+                    example: 'Lux'
+              room_id:
+                $ref: "#/definitions/uuid"
+  '401':
+    description: Returns an error, as the room is not available for the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to a Room
+  '404':
+    description: Returns an error, as the room id does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The roomid does not exist  

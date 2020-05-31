@@ -1,0 +1,55 @@
+Create a new sensor type
+---
+tags:
+- Types
+definitions:
+  type_metadata:
+    properties:
+      name:
+        type: string
+        description: Sensor's Type name
+        example: "Temperatura"
+      description:
+        type: string
+        description: Sensor's Type description
+        example: 'Valor médio da Temperatura ao redor do Sensor'
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    description: Information on the new sensor type
+    schema:
+      $ref: '#/definitions/type_metadata'
+responses:
+  '200':
+    description: Returns the new Type's name created
+    schema:
+      properties:
+        name:
+          type: string
+          example: 'Temperatura'
+  '400':
+    enum: ["New Data Type Details Incomplete", "One of the detail fields has more than 50 characters", "This data type already exists"]
+    description: >
+      Returns an error description in this list:
+        * New Data Type Details Incomplete
+        * One of the detail fields has more than 50 characters
+        * This data type already exists
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: New Data Type Details Incomplete
+  '401':
+    description: Returns an error, as this endpoint is not available
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
