@@ -5,7 +5,11 @@ tags:
 consumes:
 - application/x-www-form-urlencoded
 produces:
-- application/json
+- text/html
 responses:
-  '501':
-    description: Not implemented
+  '200':
+    description: Means that you are already logged in
+    examples:
+      text/html: OK
+  '302':
+    description: Means the redirect was successful

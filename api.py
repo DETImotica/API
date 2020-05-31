@@ -654,7 +654,7 @@ def sensors_room_id_admin(roomid):
             return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
 
 @app.route("/room/<roomid>/sensors/full", methods=['GET'])
-##@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
+@swag_from('docs/rooms/room_sensors_full_get.yml', methods=['GET'])
 def sensors_room_id_fullversion(roomid):
     '''
     [GET] Get full meta_info from all the sensors in a room <roomid>
@@ -677,7 +677,7 @@ def sensors_room_id_fullversion(roomid):
 
 @app.route("/users", methods=['GET'])
 @admin_only
-@swag_from('docs/users/users.yml')
+@swag_from('docs/users/users.yml', methods=['GET'])
 def users():
     '''
     Get all users uuid from the database 
@@ -687,7 +687,7 @@ def users():
 
 @app.route("/users/full", methods=['GET'])
 @admin_only
-@swag_from('docs/users/users.yml')
+@swag_from('docs/users/users_full.yml', methods=['GET'])
 def users_full():
     '''
     Get all users uuid from the database 
@@ -696,7 +696,7 @@ def users_full():
 
 @app.route("/user", methods=['POST'])
 @admin_only
-#@swag_from('docs/users/users.yml')
+@swag_from('docs/users/user.yml', methods=['POST'])
 @csrf.exempt
 def user_id():
     '''
@@ -719,7 +719,9 @@ def user_id():
 
 @app.route("/user/<userid>", methods=['GET','POST','DELETE'])
 @admin_only
-#@swag_from('docs/users/users.yml')
+@swag_from('docs/users/users_userid_get.yml', methods=['GET'])
+@swag_from('docs/users/users_userid_post.yml', methods=['POST'])
+@swag_from('docs/users/users_userid_delete.yml', methods=['DELETE'])
 @csrf.exempt
 def user_id_admin(userid):
     '''
@@ -759,7 +761,6 @@ def user_id_admin(userid):
 
 
 @app.route("/identity")
-#@swag_from('docs/users/identity.yml')
 def get_username():
     '''
     Get user session information
@@ -788,7 +789,7 @@ def sensors():
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
 @app.route("/types", methods=['GET'])
-@swag_from('docs/sensors/types.yml')
+@swag_from('docs/types/types.yml')
 def types():
     '''
     Get all types of sensors for a user from the database
@@ -930,6 +931,7 @@ def sensor_description_admin(sensorid):
 
 @app.route("/sensor/<sensorid>/key", methods=['GET'])
 @admin_only
+@swag_from('docs/sensors/sensor_sensorid_key.yml', methods=['GET'])
 def sensor_key(sensorid):
     try:
         pgdb.isSensorFree(sensorid)
@@ -983,15 +985,6 @@ def sensor_measure(sensorid, option):
         return Response(influxdb.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
     return Response(json.dumps({"error_description" : "Option does not exist"}), status=404, mimetype='application/json')
 
-@app.route("/sensor/<sensorid>/event/<option>", methods=['GET'])
-@swag_from('docs/sensors/sensor_event.yml')
-def sensor_event(sensorid, option):
-    '''
-    Verify if the sensor supports "Events" from database
-    '''
-    # get data from influx
-    return jsonify(RESP_501), 501
-
 
 ####################################################
 ##              Type Data Methods                 ##
@@ -999,7 +992,7 @@ def sensor_event(sensorid, option):
 
 @app.route("/type", methods=['POST'])
 @admin_only
-##@swag_from('docs/sensors/types.yml')
+@swag_from('docs/types/type.yml', methods=['POST'])
 @csrf.exempt
 def new_type():
     if not request.json:
@@ -1020,7 +1013,7 @@ def new_type():
     return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
 
 @app.route("/type/<id>", methods=['GET'])
-##@swag_from('docs/sensors/types.yml')
+@swag_from('docs/types/type_typename_get.yml', methods=['GET'])
 def typesFromName(id):
     user_attrs = _get_user_attrs(session)
     
@@ -1035,7 +1028,8 @@ def typesFromName(id):
 @app.route("/type/<id>", methods=['POST', 'DELETE'])
 @admin_only
 @csrf.exempt
-##@swag_from('docs/sensors/types.yml')
+@swag_from('docs/types/type_typename_post.yml', methods=['POST'])
+@swag_from('docs/types/type_typename_delete.yml', methods=['DELETE'])
 def typesFromName_admin(id):
     if request.method == 'POST':
         if not request.json:
@@ -1069,6 +1063,7 @@ def typesFromName_admin(id):
 @app.route("/accessPolicy", methods=['POST'])
 @admin_only
 @csrf.exempt
+@swag_from('docs/access/policy.yml', methods=['POST'])
 def newAccessPolicy():
     response = _access_mgr.create_policy(request)
     if not response[0]:
@@ -1078,7 +1073,8 @@ def newAccessPolicy():
 @app.route("/accessPolicy/<policyid>", methods=['POST', 'DELETE'])
 @admin_only
 @csrf.exempt
-##@swag_from('docs/sensors/types.yml')
+@swag_from('docs/access/updatePolicy.yml', methods=['POST'])
+@swag_from('docs/access/deletePolicy.yml', methods=['DELETE'])
 def accessPolicy(policy_id):
     if request.method == 'POST' :
         _access_mgr.update_policy(policy_id)
@@ -1090,7 +1086,7 @@ def accessPolicy(policy_id):
 
 @app.route("/accessPolicies", methods=['GET'])
 @admin_only
-##@swag_from('docs/sensors/types.yml')
+@swag_from('docs/access/policies.yml', methods=['GET'])
 def getAllAccessPolicies():
     if not request.json:
         return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')

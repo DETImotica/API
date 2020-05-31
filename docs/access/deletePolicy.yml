@@ -1,0 +1,37 @@
+Delete an existing Access Control Policy
+---
+tags:
+- Policies
+produces:
+- application/json
+parameters:
+  - name: id
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+responses:
+  '200':
+    description: Policy was deleted succesfully
+    schema:
+      response: Policy Deleted
+      properties:
+        response:
+          type: string
+          example: "OK"
+  '400':
+    description: Bad Request
+    schema:
+      error_description: Policy not Deleted
+      properties:
+        error_description:
+          type: string
+          example: "Error"
+  '401':
+    description: Returns an error, as this endpoint is only available for admins
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint

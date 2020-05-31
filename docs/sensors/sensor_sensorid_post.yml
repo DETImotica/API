@@ -2,10 +2,57 @@ Update metadata on a given sensor
 ---
 tags:
 - Sensors
+parameters:
+  - name: sensorid
+    in: path
+    type: string
+    description: uuid of the desired sensor
+    required: true
+  - in: body
+    name: body
+    required: true
+    description: Information on the new sensor
+    schema:
+      $ref: '#/definitions/sensor_metadata'
 consumes:
 - application/x-www-form-urlencoded
 produces:
 - application/json
 responses:
-  '501':
-    description: Not implemented
+  '200':
+    description: Returns the updated Sensors ID
+    schema:
+      id: new_sensor_id
+      properties:
+        id:
+          $ref: "#/definitions/uuid"
+  '400':
+    enum: ["Sensor Details Incomplete", "One of the detail fields has more than 50 characters", "The Unit Symbol has more than 3 characters"]
+    description: >
+      Returns an error description in this list:
+        * Sensor Details Incomplete
+        * One of the detail fields has more than 50 characters
+        * The Unit Symbol has more than 3 characters
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Sensor Details Incomplete
+  '401':
+    description: Returns an error, as only admin can create new sensors
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404':
+    enum: ["The sensor type does not exist", "The roomid does not exist"]
+    description: Returns an error, as the room id or the sensor type sent in the form does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The sensor type does not exist

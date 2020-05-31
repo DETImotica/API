@@ -2,6 +2,18 @@ Get list of sensors in a given room
 ---
 tags:
 - Rooms
+definitions:
+  sensors_error_add:
+    properties:
+      non_free:
+        type: array
+        items:
+          $ref: "#/definitions/uuid"
+      non_existent:
+        type: array
+        items:
+          type: uuid
+          example: '42fef63c-0642-42a0-93de-9e71bcc2649f'
 consumes:
 - application/x-www-form-urlencoded
 produces:
@@ -14,7 +26,7 @@ parameters:
     required: true
 responses:
   '200':
-    description: Returns a list of the IDs of all existing sensors in the room
+    description: Returns a list of the IDs of all existing sensors in the room that the user as access
     schema:
       id: ids_list
       properties:
@@ -22,5 +34,19 @@ responses:
           type: array
           items:
             $ref: "#/definitions/uuid"
+  '401':
+    description: Returns an error, as the room is not available for the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to a Room
   '404':
-    description: The specified room was not found
+    description: Returns an error, as the room id does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The roomid does not exist

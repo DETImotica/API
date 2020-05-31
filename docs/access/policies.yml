@@ -1,0 +1,85 @@
+Get a list of all existing access policies to the API resources
+---
+tags:
+- Policies
+definitions:
+  policy_rule:
+      properties:
+        subjects:
+          type: array
+          items:
+            properties:
+              teacher:
+                type: boolean
+                description: type of subject
+                example: "True"
+              courses:
+                type: array
+                items:
+                  type: string
+                  description : Name of the courses
+                  example: PEI
+        actions:
+          type: array
+          items:
+            type: string
+            description: type of action
+            example: GET
+        resources:
+          type: array
+          items:
+            properties:
+              sensor:
+                $ref: "#/definitions/uuid"
+        context:
+          properties:
+            hour:
+              properties:
+                from:
+                  type: string
+                  description: hour where the policy starts
+                  example: "08:30:00"
+                to:
+                  type: string
+                  description: hour where the policy ends
+                  example: "18:30:00"
+            ip:
+              type: string
+              description: internal 
+              example: internal
+        effect:
+          type: string
+          example: allow
+        description:
+          type: string
+          example: Permitir que um docente que lecione PEI possa ler ou modificar atributos do sensor 144f das 8h30 às 18h30 dentro da UA
+produces:
+- application/json
+parameters:
+  - in: "body"
+    name: "body"
+    required: false
+    description: "(Not Required)\nWhen a filter is sent in the body, the returned policies can be selected.\n
+                A filter is a json with this format {'key' : 'resource_id'}, the 'key' can take the values ['resources.room', 'resources.sensor', 'resources.type']"
+    properties:
+      resources.room:
+        $ref: '#/definitions/policy_rule'
+
+      
+responses:
+  '200':
+    description: Returns a list of the policies of all existing resources
+    schema:
+      properties:
+        policies:
+          type: array
+          items:
+            $ref: "#/definitions/policy_rule"
+  '401':
+    description: Returns an error, as this endpoint is only available for admins
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint

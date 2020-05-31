@@ -1,25 +1,24 @@
-Delete a given sensor from the system
+Get User with the id userid of the database
 ---
 tags:
-- Sensors
-parameters:
-  - name: sensorid
-    in: path
-    type: string
-    description: uuid of the desired sensor
-    required: true
+- Users
 produces:
 - application/json
+parameters:
+  - name: userid
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
 responses:
   '200':
-    description: Returns the deleted Sensors ID
+    description: Returns the remove user's ID
     schema:
-      id: new_sensor_id
       properties:
         id:
           $ref: "#/definitions/uuid"
   '401':
-    description: Returns an error, as only admin can delete existing sensors
+    description: Returns an error as only admins can remove users
     schema:
       error_description: error_details_message
       properties:
@@ -27,10 +26,10 @@ responses:
           type: string
           example: Access denied, admin only endpoint
   '404':
-    description: Returns an error, as the sensor id sent does not exist
+    description: Returns an error, as the user id does not exist
     schema:
       error_description: error_details_message
       properties:
         error_description:
           type: string
-          example: The sensorid does not exist
+          example: The userid does not exist

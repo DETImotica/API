@@ -1,0 +1,43 @@
+Update a new Access Control Policy
+---
+tags:
+- Policies
+produces:
+- application/json
+parameters:
+  - name: id
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+  - in: body
+    name: body
+    required: true
+    description: "Replace the policy selected with a new one"
+    schema:
+      $ref: '#/definitions/policy_rule'
+responses:
+  '200':
+    description: Policy was changed succesfully
+    schema:
+      response: Policy Changed
+      properties:
+        response:
+          type: string
+          example: "OK"
+  '400':
+    description: Bad Request
+    schema:
+      error_description: Policy not Changed, no valid subject
+      properties:
+        error_description:
+          type: string
+          example: "Error"
+  '401':
+    description: Returns an error, as this endpoint is only available for admins
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint

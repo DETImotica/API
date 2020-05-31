@@ -1,4 +1,4 @@
-Get a list of all existing rooms
+Get a list of all existing rooms for a user, where each one has at least one sensor available
 ---
 tags:
 - Rooms
