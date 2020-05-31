@@ -18,7 +18,6 @@ pgdb = PGDB()
 #ruleName should be sensor id, otherwise the notification will not work
 @mobile.route('/notifications', methods=['POST'])
 def mobile_notifications ():
-    
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     

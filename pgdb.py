@@ -20,10 +20,12 @@ class PGDB(object):
     def __repr__(self):
         return self.__str__()
 
+
+
+
 ##################################################
 ##               ROOM METHODS                  ###
 ##################################################
-
 
     def getRooms(self):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
@@ -63,17 +65,12 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
 
-
     def deleteRoom(self, roomid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         cursor.execute("DELETE FROM Espaco WHERE Espaco.ID = %s;", (str(roomid),))
         db_con.commit()
         db_con.close()
-
-
-
-
 
     def getSensorsFromRoom(self, roomid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
@@ -109,11 +106,6 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
 
-
-
-
-
-
     def roomExists(self, roomid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -133,9 +125,6 @@ class PGDB(object):
             return False
         db_con.close()
         return True
-
-
-
 
 
 
@@ -164,10 +153,6 @@ class PGDB(object):
                 }
         db_con.close()
         return result
-
-
-
-
 
     def createSensor(self, sensorid, sensordata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
@@ -205,9 +190,6 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
 
-
-
-
     def isSensorFree(self, sensorid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -231,13 +213,6 @@ class PGDB(object):
         if result == roomid:
             return True
         return False
-
-
-
-
-
-
-
 
 
 
@@ -276,8 +251,20 @@ class PGDB(object):
         db_con.close()
         return {"name": name, "description": description, "units": l_simbolos}
 
+    def getSensorTypeID(self, sensorid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
 
+        cursor.execute(
+            "SELECT DISTINCT Tipo_Sensor.id FROM Sensor JOIN TipoSensor ON Sensor.Nome_Tiposensor = Tipo_Sensor.Nome WHERE Sensor.id = %s;",
+            (str(id),))
 
+        type_sensor = cursor.fetchone()
+        
+        db_con.close()
+        
+        return type_sensor[0]
+        
     def createSensorType(self, details):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -285,8 +272,6 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
         return id
-
-
 
     def updateSensorType(self, id, new_details):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
@@ -307,9 +292,6 @@ class PGDB(object):
         db_con.commit()
         db_con.close()
 
-
-
-
     def datatypeNameExists(self, name):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -329,8 +311,6 @@ class PGDB(object):
             return False
         db_con.close()
         return True
-
-
 
     # TODO pode rebentar
     def getSensorsFromType(self, id):
@@ -358,7 +338,6 @@ class PGDB(object):
         l_tuplos = cursor.fetchall()
         db_con.close()
         return [t[0] for t in l_tuplos]
-
 
     def getUsersFull(self):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)

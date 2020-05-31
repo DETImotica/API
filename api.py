@@ -166,7 +166,9 @@ def _get_attr(scope, at, ats):
     if resp.status_code != 200:
         return None
 
-    return _simplify_attr_dict(xmltodict.parse(resp.content.decode()))
+    res = _simplify_attr_dict(xmltodict.parse(resp.content.decode()))
+    #print(res)
+    return res
 
 # validate the token
 def _validate_token(uuid, email):
@@ -182,17 +184,32 @@ def _validate_token(uuid, email):
 
     return uu is not None and uuid == uu['iupi'] and email == uu['email']
 
-# return a dict with all user attributes.
+# return a dict with all relevant user attributes (on this iteration).
 def _get_user_attrs(s):
     at = session_cache.get(s.get('uuid'))
     ats = session_cache.get(at)
 
-    return {**_get_attr('uu', at, ats),
-                    **_get_attr('name', at, ats),
-                    **_get_attr('student_info', at, ats),
-                    **_get_attr('student_courses', at, ats),
-                    **_get_attr('teacher_courses', at, ats)
-           }
+    #print(_get_attr('teacher_courses', at, ats))
+
+    res = {**_get_attr('uu', at, ats), **_get_attr('name', at, ats)}
+
+    st_info = _get_attr('student_info', at, ats)
+    if st_info:
+        st_info.pop('Foto', None)
+
+    res.update(st_info)
+
+    st_courses = _get_attr('student_courses', at, ats)
+    res.update(student='true' if st_courses else 'false')
+    if st_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasAluno']])
+
+    prof_courses = _get_attr('teacher_courses', at, ats)
+    res.update(teacher= 'true' if prof_courses else 'false')
+    if prof_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasDocente']])
+
+    return res
 
 def _decode_flask_cookie(cookie_str):
     from itsdangerous import URLSafeTimedSerializer
@@ -225,25 +242,24 @@ def before_req_f():
     print(request.path)
     if "login" in request.path:
         print((session.get('user'), session.get('uuid')))
-        if session.get('user') and session.get('uuid'):
-            if _validate_token(session.get('uuid'), session.get('user')):
-                if 'app' not in session:
-                    return Response("OK", 200)
-                elif 'redirect_url' in session:
-                    appid = session.get('app')
-                    if appid == _mkid:
-                        session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
-                        session_cookie = session_serializer.dumps(dict(session))
-                        return redirect(session.get('redirect_url') + "?s=" + session_cookie, 301)
-                    elif appid == _gkid:
-                        r = make_response(redirect(request.host_url+"dashboards", 302))
-                        r.headers['User'] = session.get('user')
-                        return r
-                    else:
-                        session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
-                        session_cookie = session_serializer.dumps(dict(session))
-                        return redirect(session.get('redirect_url') + "?s=" + session_cookie, 301)
-                return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
+        if session.get('user') and session.get('uuid') and _validate_token(session.get('uuid'), session.get('user')):
+            appid = request.args.get('app')
+            redir = request.args.get('app')
+            if 'app' not in session:
+                return Response("OK", 200)
+            elif appid == _mkid:
+                session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+                session_cookie = session_serializer.dumps(dict(session))
+                return redirect(redir + "?s=" + session_cookie, 301)
+            elif appid == _gkid:
+                r = make_response(redirect(request.host_url + "dashboards", 302))
+                r.headers['User'] = session.get('user')
+                return r
+            else:
+                session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+                session_cookie = session_serializer.dumps(dict(session))
+                return redirect(session.get('redirect_url') + "?s=" + session_cookie, 301)
+            return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
 #        elif request.cookies.get("fls"):
 #            fls = _decode_flask_cookie(request.cookies.get("fls"))
 #            if fls:
@@ -835,6 +851,8 @@ def new_sensor():
         url = "http://192.168.85.112/device/standalone"
         data_influx = {"tenant-id": "detimotic", "device-id" : str(id), "password": _hono_register_pw}
         response = requests.post(url, headers={"Content-Type": "application/json"}, auth=(_hono_user_name, _hono_user_pw), timeout=5, data=json.dumps(data_influx))
+        if not response or response.status_code != 200:
+            return Response(json.dumps({"error_description": "Connection to influx error"}), status=500, mimetype='application/json')
     except:
         return Response(json.dumps({"error_description": "Connection to influx timeout"}), status=408, mimetype='application/json')
 
