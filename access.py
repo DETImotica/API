@@ -256,7 +256,7 @@ class PolicyManager(ABAC):
 
         uid = details.pop('uid', None)
 
-        new_pol = self._raw_policy_collection.find_one_and_update({'uid': uid}, details, return_document=ReturnDocument.AFTER)
+        new_pol = self._raw_policy_collection.find_one_and_replace({'uid': uid}, details, return_document=ReturnDocument.AFTER)
 
         self.delete_policy(uid)
         self.create_policy(new_pol, internal=True)
