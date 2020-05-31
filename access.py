@@ -355,7 +355,9 @@ class PDP(ABAC):
 
         g = Guard(self._storage, RulesChecker())
 
-        return g.is_allowed(inq)
+        res = g.is_allowed(inq)
+        print(res)
+        return res
 
 
     def get_access(self, struct_inquiry):

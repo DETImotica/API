@@ -244,13 +244,9 @@ def before_req_f():
         print((session.get('user'), session.get('uuid')))
         if session.get('user') and session.get('uuid') and _validate_token(session.get('uuid'), session.get('user')):
             appid = request.args.get('app')
-            redir = request.args.get('app')
-            if 'app' not in session:
+            redir = request.args.get('redirect_url')
+            if not appid:
                 return Response("OK", 200)
-            elif appid == _mkid:
-                session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
-                session_cookie = session_serializer.dumps(dict(session))
-                return redirect(redir + "?s=" + session_cookie, 301)
             elif appid == _gkid:
                 r = make_response(redirect(request.host_url + "dashboards", 302))
                 r.headers['User'] = session.get('user')
@@ -258,7 +254,7 @@ def before_req_f():
             else:
                 session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
                 session_cookie = session_serializer.dumps(dict(session))
-                return redirect(session.get('redirect_url') + "?s=" + session_cookie, 301)
+                return redirect(redir + "?s=" + session_cookie, 301)
             return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
 #        elif request.cookies.get("fls"):
 #            fls = _decode_flask_cookie(request.cookies.get("fls"))
