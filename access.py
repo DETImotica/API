@@ -348,7 +348,7 @@ class PDP(ABAC):
         inq = Inquiry(subject=subject_data,
                       action=req.method,
                       resource=resource,
-                      context={'ip': req.remote_addr, 'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
+                      context={'ip': req.headers['X-Forwarded-For'][0], 'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
                     )
 
         print(inq.to_json())
