@@ -160,7 +160,7 @@ class PolicyManager(ABAC):
                     elif k == 'courses':
                         sub.update({k : rules.AnyIn(*s[k])})
                     else:
-                        sub.update({k : rules.Eq(s[k])})
+                        sub.update({k : rules.string.Equal(s[k])})
                     
                 subject.append(sub)
         
@@ -174,7 +174,7 @@ class PolicyManager(ABAC):
                 if type(req_json['actions']) is not list:
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
                 
-                action = [rules.Eq(a) for a in req_json['actions']]
+                action = [rules.string.Equal(a) for a in req_json['actions']]
             ####
             # 'resource' is not mandatory, defaults to any element
             ####
@@ -192,14 +192,14 @@ class PolicyManager(ABAC):
                 for k in req_json['context']:
                     if k == 'hour':
                         if 'from' in req_json['context']['hour'] and 'to' in req_json['context']['hour']:
-                            context['hour'] = rules.Or(rules.GreaterOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['from'])),
+                            context['hour'] = rules.And(rules.GreaterOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['from'])),
                                                    rules.LessOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['to']))
                                                   )
                         else:
                             return False, "ERROR: Malformed access JSON - context's hours needs 'from' and 'to' attributes!"
                     elif k == 'date':
                         if 'from' in req_json['context']['date'] and 'to' in req_json['context']['date']:
-                            context['date'] = rules.Or(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from'])),
+                            context['date'] = rules.And(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from'])),
                                                    rules.LessOrEqual(ABAC.unix_timestamp(req_json['context']['date']['to']))
                                                   )
                         elif 'from' in req_json['context']['date']:
@@ -209,13 +209,13 @@ class PolicyManager(ABAC):
                         else:
                             return False, "ERROR: Malformed access JSON - context's date needs 'from' and 'to' attributes!"
                     elif k == 'ip':
-                        internal_rule = rules.Or(rules.CIDR('10.0.0.0/8'), rules.CIDR('172.16.0.0/12'), rules.CIDR('192.168.0.0/16'))
+                        internal_rule = [rules.CIDR('10.0.0.0/8'), rules.CIDR('172.16.0.0/12'), rules.CIDR('192.168.0.0/16')]
                         if req_json['context']['ip'].lower() == "internal":
                             context['ip'] = internal_rule
                         else:
-                            context['ip'] = rules.Not(internal_rule)
+                            context['ip'] = rules.Not(rules.Or(internal_rule))
                     else:
-                        context[k] = rules.Eq(req_json['context'][k])
+                        context[k] = rules.string.Equal(req_json['context'][k])
             ####
             # 'description is not mandatory, defaults to None
             ####
