@@ -154,6 +154,18 @@ class PGDB(object):
         db_con.close()
         return result
 
+    def getSensorWithoutRoom(self, sensorid):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT Sensor.Descricao,Nome_TipoSensor,Simbolo FROM Sensor WHERE Sensor.ID = %s",  (sensorid,))
+        result = cursor.fetchone()
+        result = {"description" : result[0],
+                "data" : { "type": result[1], "unit_symbol": result[2]},
+                "room_id": "Null"
+                }
+        db_con.close()
+        return result
+
     def createSensor(self, sensorid, sensordata):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
@@ -198,7 +210,6 @@ class PGDB(object):
 
         if result == None :
             raise ValueError
-            print("O sensor não existe")
         if result == "Null":
             print("Está no armazem")
             return True

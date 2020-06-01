@@ -880,7 +880,11 @@ def sensor_description(sensorid):
         print("passou verificação")
         if not _pdp.get_http_req_access(request, _get_user_attrs(session)):
             return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
-        return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
+        
+        try:
+            return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
+        except TypeError:
+            return Response(json.dumps(pgdb.getSensorWithoutRoom(sensorid)), status=200, mimetype='application/json')
     except:
         return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
 
