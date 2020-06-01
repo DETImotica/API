@@ -7,10 +7,10 @@ consumes:
 produces:
 - application/json
 parameters:
-  - name: typename
+  - name: id
     in: path
     type: string
-    description: type's name of the sensor type
+    description: type's id of the sensor type
     required: true
   - in: body
     name: body
