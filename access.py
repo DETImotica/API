@@ -170,6 +170,7 @@ class PolicyManager(ABAC):
             # 'actions' value has to be a json list, although not mandatory
             ####
 
+            action = [rules.Any()]
             if 'actions' in req_json:
                 if type(req_json['actions']) is not list:
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
