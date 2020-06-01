@@ -563,7 +563,7 @@ def room_id(roomid):
 
     if request.method == 'GET': 
         user_attrs = _get_user_attrs(session)
-        if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
+        if not _pdp.get_http_req_access(request, user_attrs):
             return Response(json.dumps({"error_description": f"Access denied to room {roomid}. Talk to an administrator"}), status=401, mimetype='application/json')
 
         return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
@@ -614,7 +614,7 @@ def sensors_room_id(roomid):
     [GET] Get all sensors id from a room <room-id>
     '''
     user_attrs = _get_user_attrs(session)
-    if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
+    if not _pdp.get_http_req_access(request, user_attrs):
         return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
     
     if request.method == 'GET': 
@@ -672,7 +672,7 @@ def sensors_room_id_fullversion(roomid):
 
     if pgdb.roomExists(roomid):
         user_attrs = _get_user_attrs(session)
-        if not _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': roomid}):
+        if not _pdp.get_http_req_access(request, user_attrs):
             return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
 
         ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
@@ -877,7 +877,7 @@ def sensor_description(sensorid):
     
     try:
         pgdb.isSensorFree(sensorid)
-        if not _pdp.get_http_req_access(request, _get_user_attrs(session), {'sensor' : sensorid}):
+        if not _pdp.get_http_req_access(request, _get_user_attrs(session)):
             return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
         return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
     except:
@@ -1030,7 +1030,7 @@ def typesFromName(id):
     if not pgdb.datatypeIdExists(id):
         return Response(json.dumps({"error_description": "The type id sent does not exist"}), status=400, mimetype='application/json')
 
-    if not _pdp.get_http_req_access(request, user_attrs, {'sensor_type' : id}):
+    if not _pdp.get_http_req_access(request, user_attrs):
         Response(json.dumps({"error description": f"Access denied to type of sensor {id}. Talk to an administrator."}), status=401, mimetype='application/json')
 
     return Response(json.dumps(pgdb.getSensorType(id)), status=200, mimetype='application/json')
