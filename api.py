@@ -504,7 +504,12 @@ def at_least_one_sensor(room):
             return True
     return False
 
-
+def at_least_one_sensor_type(t):
+    user_attrs = _get_user_attrs(session)
+    for s in pgdb.getSensorsFromType(t):
+        if _pdp.get_http_req_access(request, user_attrs, {'sensor' : s}):
+            return True
+    return False
 
 @app.route("/room", methods=['POST'])
 @admin_only
@@ -807,7 +812,7 @@ def types():
 
     user_attrs = _get_user_attrs(session)
 
-    d = {"ids" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'type' : tuplo[0]})]} 
+    d = {"ids" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'type' : tuplo[0]} or at_least_one_sensor_type(tuplo[0]))]} 
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
 @app.route("/sensor", methods=['POST'])
