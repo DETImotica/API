@@ -109,6 +109,7 @@ class PolicyManager(ABAC):
         if self._raw_policy_collection.estimated_document_count() < 1 and len(list(self._storage.retrieve_all())) < 1:
             admin_pol = {'subjects': [{'admin': 'true'}], 'description': '[DEFAULT] All admins have full access to the system'}
             self.create_policy(admin_pol, internal=True)
+            self._storage.retrieve_all()
 
     def __str__(self):
         return "PolicyManager(" + str(self._storage) + ")"
@@ -188,7 +189,7 @@ class PolicyManager(ABAC):
             ####
             # 'context' is not mandatory, defaults to empty
             ####
-            context = {"ip": rules.Any(), "hour": rules.Any(), "date": rules.Any()}
+            context = {}
             if 'context' in req_json:
                 for k in req_json['context']:
                     if k == 'hour':
