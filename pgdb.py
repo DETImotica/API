@@ -334,8 +334,8 @@ class PGDB(object):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         cursor.execute(
-            "SELECT Sensor.id FROM (SELECT Nome FROM TipoSensor WHERE id = %d) as X JOIN Sensor ON Nome_TipoSensor = X.Nome;",
-            (tid,))
+            "SELECT Sensor.id FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON Nome_TipoSensor = X.Nome;",
+            (str(tid),))
         l_tuplos = cursor.fetchall()
         db_con.close()
 
