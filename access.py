@@ -182,7 +182,7 @@ class PolicyManager(ABAC):
             if 'resources' in req_json:
                 if type(req_json['resources']) is not list:
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
-                resource = [{k : rules.Eq(s[k])} for s in req_json['resources'] for k in s]
+                resource = [{k : rules.string.Equal(s[k])} for s in req_json['resources'] for k in s]
             
             ####
             # 'context' is not mandatory, defaults to empty
