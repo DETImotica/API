@@ -153,21 +153,23 @@ class PolicyManager(ABAC):
             subject = []
 
             for s in req_json['subjects']:
+                sub = {'email': rules.Any()}
                 for k in s:
                     if k in ['admin', 'student', 'teacher']:
-                        subject.append({k : (rules.Truthy() if s[k].lower() == 'true' else rules.Falsy())})
+                        sub.update({k : (rules.Truthy() if s[k].lower() == 'true' else rules.Falsy())})
                     elif k == 'courses':
-                        subject.append({k : rules.AnyIn(*s[k])})
+                        sub.update({k : rules.AnyIn(*s[k])})
                     else:
-                        subject.append({k : rules.Eq(s[k])})
-
+                        sub.update({k : rules.Eq(s[k])})
+                    
+                subject.append(sub)
+        
             if not subject:
                 return False, "ERROR: malformed access JSON - 'subjects' doesn't have attributes defined."
             ####
             # 'actions' value has to be a json list, although not mandatory
             ####
 
-            action = [{'email': rules.Any()}]
             if 'actions' in req_json:
                 if type(req_json['actions']) is not list:
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
@@ -190,14 +192,14 @@ class PolicyManager(ABAC):
                 for k in req_json['context']:
                     if k == 'hour':
                         if 'from' in req_json['context']['hour'] and 'to' in req_json['context']['hour']:
-                            context['hour'] = rules.And(rules.GreaterOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['from'])),
+                            context['hour'] = rules.Or(rules.GreaterOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['from'])),
                                                    rules.LessOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['to']))
                                                   )
                         else:
                             return False, "ERROR: Malformed access JSON - context's hours needs 'from' and 'to' attributes!"
                     elif k == 'date':
                         if 'from' in req_json['context']['date'] and 'to' in req_json['context']['date']:
-                            context['date'] = rules.And(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from'])),
+                            context['date'] = rules.Or(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from'])),
                                                    rules.LessOrEqual(ABAC.unix_timestamp(req_json['context']['date']['to']))
                                                   )
                         elif 'from' in req_json['context']['date']:
