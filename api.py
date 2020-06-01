@@ -803,18 +803,6 @@ def sensors():
     d = {"ids" : [tuplo[0] for tuplo in s_list if _pdp.get_http_req_access(request, user_attrs, {'sensor' : tuplo[0]})]} 
     return Response(json.dumps(d), status=200, mimetype='application/json')
 
-@app.route("/types", methods=['GET'])
-@swag_from('docs/types/types.yml')
-def types():
-    '''
-    Get all types of sensors for a user from the database
-    '''
-
-    user_attrs = _get_user_attrs(session)
-
-    d = {"ids" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'type' : tuplo[0]} or at_least_one_sensor_type(tuplo[0]))]} 
-    return Response(json.dumps(d), status=200, mimetype='application/json')
-
 @app.route("/sensor", methods=['POST'])
 @admin_only
 @swag_from('docs/sensors/sensor.yml')
@@ -1009,6 +997,18 @@ def sensor_measure(sensorid, option):
 ####################################################
 ##              Type Data Methods                 ##
 ####################################################
+
+@app.route("/types", methods=['GET'])
+@swag_from('docs/types/types.yml')
+def types():
+    '''
+    Get all types of sensors for a user from the database
+    '''
+
+    user_attrs = _get_user_attrs(session)
+
+    d = {"ids" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'type' : tuplo[0]}) or at_least_one_sensor_type(tuplo[0])]} 
+    return Response(json.dumps(d), status=200, mimetype='application/json')
 
 @app.route("/type", methods=['POST'])
 @admin_only
