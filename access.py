@@ -329,31 +329,60 @@ class PDP(ABAC):
             else:
                 return False
         elif resource_path[1] == 'type':
-            resource.update({resource_path[1]: resource_path[2]})
-        elif resource_path[1] == 'room':
-            resource.update({resource_path[1]: resource_path[2]})
-            #resource.update({"sensor": "", "type": ""})
-        elif resource_path[1] == 'sensor':
-            if len(resource_path) < 3:
+            # get/modify/delete type
+            if len(resource_path) >= 3:
+                resource.update({resource_path[1]: resource_path[2]})
+            
+            if len(resource_path) > 3:
+                # it's a sensor of a type
                 if opt_resource:
-                    #sensor_type = str(self._pgdb.getSensorTypeID(resource_path[2]))
-                    #sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
                     resource.update(opt_resource)
-                    #resource.update({'type': sensor_type, 'room': sensor_roomid})
+                    sensor_type = str(self._pgdb.getSensorTypeID(opt_resource['sensor']))
+                    resource.update({'type': sensor_type})
                 else:
                     return False
+            # create type
+            elif opt_resource:
+                    resource.update(opt_resource)
+
+        elif resource_path[1] == 'room':
+            # it's a get/modify/delete on a specific room
+            if len(resource_path) >= 3:
+                resource.update({resource_path[1]: resource_path[2]})
+            # it's a sensor on a room (list get)
+            if len(resource_path) > 3:
+                # get its sensors
+                if resource_path[3] == "sensors":
+                    if opt_resource:
+                        resource.update(opt_resource)
+                        sensor_type = str(self._pgdb.getSensorTypeID(opt_resource['sensor']))
+                        resource.update({'type': sensor_type})
+                    else:
+                        return False
+                elif resource_path[3] == "types":
+                    # it's a type on a room (list get)
+                    if opt_resource:
+                        resource.update(opt_resource)
+                    else:
+                        return False
+            elif opt_resource:
+                # it's an update or delete
+                resource.update(opt_resource)
+
+        elif resource_path[1] == 'sensor':
+            if len(resource_path) < 3:
+                # create sensor
+                if opt_resource:
+                    resource.update(opt_resource)
+
             else:
-                # get the respective sensor's room and type attributes alongside its id
+                # get the respective sensor's room and type attributes alongside its id (for any action)
                 sensor_type = str(self._pgdb.getSensorTypeID(resource_path[2]))
                 sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
 
                 resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
-                
-
-                #resource.update({resource_path[1]: resource_path[2]})
-                #details = self._pgdb.getSensor(resource_path[2])
-                #resource.update({'type': details['data']['type']})
             
+            # request a value from a sensor
             if len(resource_path) > 3 and resource_path[3] == 'measure':
                 resource.update({resource_path[3]: resource_path[4]})
             
