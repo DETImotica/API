@@ -374,10 +374,9 @@ class PDP(ABAC):
                 sensor_type = str(self._pgdb.getSensorTypeID(resource_path[2]))
                 try: 
                     sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
+                    resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
                 except TypeError:
                     resource.update({resource_path[1]: resource_path[2], 'type': sensor_type})
-
-                resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
             
             # request a value from a sensor
             if len(resource_path) > 3 and resource_path[3] == 'measure':
