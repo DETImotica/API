@@ -90,9 +90,6 @@ csrf = CSRFProtect(app)
 csrf.exempt(grafana)
 csrf.exempt(mobile)
 
-paranoid = Paranoid(app)
-paranoid.redirect_view = "/"
-
 cache = Cache(app)
 session_cache = Cache(app, config={'CACHE_DIR': ".app_session_cache/",
                                    'CACHE_DEFAULT_TIMEOUT': 3600*24*30
@@ -143,9 +140,8 @@ def _simplify_attr_dict(xmldict):
                 res[key] = xmldict[key]
     return res
 
-@paranoid.on_invalid_session
-def paranoid_error_session():
-    return Response("ERROR: Invalid session (host does not match original request)", status=403)
+# def paranoid_error_session():
+#     return Response("ERROR: Invalid session (host does not match original request)", status=403)
 
 @cache.memoize(hash_method=sha3_256)
 def _get_attr(scope, at, ats):
@@ -1117,7 +1113,7 @@ if __name__ == "__main__":
         app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
 
         csrf.init_app(app)
-        paranoid.init_app(app)
+        #paranoid.init_app(app)
         cache.init_app(app)
         session_cache.init_app(app)
 
