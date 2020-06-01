@@ -57,7 +57,7 @@ class ABAC(object):
                 
                 self._mongo_client = client
                 self._raw_policy_collection = client.get_database(config['mongodb']['db']).get_collection(config['mongodb']['raw_collection'])
-                self._storage = EnfoldCache(MongoStorage(client, config['mongodb']['collection']), cache=MemoryStorage())
+                self._storage = MongoStorage(client, config['mongodb']['collection'])
 
                 self._influxdb = DataDB()
                 self._pgdb = PGDB()
@@ -96,7 +96,7 @@ class ABAC(object):
         raise ValueError("Timestamp must be a string.")
 
     def get_storage_type(self):
-        return ("MongoDB", str(self._storage.cache))
+        return ("MongoDB", str(self._storage))
 
     def check_information_points(self):
         return (str(self._pgdb), "Indentity@UA OAuth")
@@ -161,15 +161,6 @@ class PolicyManager(ABAC):
                         sub.update({k : rules.AnyIn(*s[k])})
                     else:
                         sub.update({k : rules.string.Equal(s[k])})
-
-                    if 'email' not in sub:
-                        sub.update({'email' : rules.Any()})
-                    if 'admin' not in sub:
-                        sub.update({'admin': rules.Falsy()})
-                    if 'student' not in sub:
-                        sub.update({'student': rules.Any()})
-                    if 'teacher' not in sub:
-                        sub.update({'teacher': rules.Any()})
                     
                 subject.append(sub)
         
@@ -253,7 +244,7 @@ class PolicyManager(ABAC):
                           context=context,
                           description=description
                          ))
-        
+
         return True, "OK"
 
     def update_policy(self, req):
