@@ -198,12 +198,12 @@ def _get_user_attrs(s):
     st_courses = _get_attr('student_courses', at, ats)
     res.update(student=bool(st_courses))
     if st_courses:
-        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasAluno']])
+        res.update(student_courses=set([s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasAluno']]))
 
     prof_courses = _get_attr('teacher_courses', at, ats)
     res.update(teacher=bool(prof_courses))
     if prof_courses:
-        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasDocente']])
+        res.update(student_courses=set([s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasDocente']]))
 
     return res
 
