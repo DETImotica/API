@@ -159,7 +159,7 @@ class PolicyManager(ABAC):
                     if k in ['admin', 'student', 'teacher']:
                         sub.update({k : (rules.Truthy() if s[k].lower() == 'true' else rules.Falsy())})
                     elif k == 'courses':
-                        sub.update({k : rules.AnyIn(*s[k])})
+                        sub.update({k : rules.AnyIn(**s[k])})
                     else:
                         sub.update({k : rules.string.Equal(s[k])})
                     
