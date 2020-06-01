@@ -563,7 +563,7 @@ def room_id(roomid):
 
     if request.method == 'GET': 
         user_attrs = _get_user_attrs(session)
-        if not _pdp.get_http_req_access(request, user_attrs):
+        if not _pdp.get_http_req_access(request, user_attrs) or not at_least_one_sensor(roomid):
             return Response(json.dumps({"error_description": f"Access denied to room {roomid}. Talk to an administrator"}), status=401, mimetype='application/json')
 
         return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
@@ -614,7 +614,7 @@ def sensors_room_id(roomid):
     [GET] Get all sensors id from a room <room-id>
     '''
     user_attrs = _get_user_attrs(session)
-    if not _pdp.get_http_req_access(request, user_attrs):
+    if not _pdp.get_http_req_access(request, user_attrs) or not at_least_one_sensor(roomid):
         return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
     
     if request.method == 'GET': 
@@ -672,7 +672,7 @@ def sensors_room_id_fullversion(roomid):
 
     if pgdb.roomExists(roomid):
         user_attrs = _get_user_attrs(session)
-        if not _pdp.get_http_req_access(request, user_attrs):
+        if not _pdp.get_http_req_access(request, user_attrs) or not at_least_one_sensor(roomid):
             return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
 
         ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
