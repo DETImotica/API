@@ -208,12 +208,12 @@ class PolicyManager(ABAC):
                             context['date'] = rules.LessOrEqual(ABAC.unix_timestamp(req_json['context']['date']['to']))
                         else:
                             return False, "ERROR: Malformed access JSON - context's date needs 'from' and 'to' attributes!"
-                    # elif k == 'ip':
-                    #     internal_rule = [rules.CIDR('10.0.0.0/8'), rules.CIDR('172.16.0.0/12'), rules.CIDR('192.168.0.0/16')]
-                    #     if req_json['context']['ip'].lower() == "internal":
-                    #         context['ip'] = internal_rule
-                    #     else:
-                    #         context['ip'] = rules.Not(rules.Or(internal_rule))
+                    elif k == 'ip':
+                        internal_rule = rules.Or(rules.CIDR('10.0.0.0/8'), rules.CIDR('172.16.0.0/12'), rules.CIDR('192.168.0.0/16'))
+                        if req_json['context']['ip'].lower() == "internal":
+                            context['ip'] = internal_rule
+                        else:
+                            context['ip'] = rules.Any()
                     else:
                         context[k] = rules.string.Equal(req_json['context'][k])
             ####
@@ -346,8 +346,8 @@ class PDP(ABAC):
         inq = Inquiry(subject=subject_data,
                       action=req.method,
                       resource=resource,
-                      context={'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
-                      #context={'ip': req.headers['X-Forwarded-For'].split(',')[0].strip(), 'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
+                      #context={'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
+                      context={'ip': req.headers['X-Forwarded-For'].split(',')[0].strip(), 'hour': ABAC.daytime_in_s(time), 'date': ABAC.unix_timestamp(day)}
                     )
 
         print(inq.to_json())
