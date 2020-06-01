@@ -412,6 +412,8 @@ def auth_callback():
         return r
     if 'app' in session and 'redirect_url' in session:
         loc = session.get('redirect_url')
+        if session['app'] == 'gestao' and not pgdb.isAdmin(session['uuid']):
+            loc += 'forbidden'
         if loc:
             session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
             session_cookie = session_serializer.dumps(dict(session))
