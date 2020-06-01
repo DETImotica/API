@@ -192,14 +192,14 @@ class PolicyManager(ABAC):
                 for k in req_json['context']:
                     if k == 'hour':
                         if 'from' in req_json['context']['hour'] and 'to' in req_json['context']['hour']:
-                            context['hour'] = rules.Or(rules.GreaterOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['from'])),
+                            context['hour'] = rules.And(rules.GreaterOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['from'])),
                                                    rules.LessOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['to']))
                                                   )
                         else:
                             return False, "ERROR: Malformed access JSON - context's hours needs 'from' and 'to' attributes!"
                     elif k == 'date':
                         if 'from' in req_json['context']['date'] and 'to' in req_json['context']['date']:
-                            context['date'] = rules.Or(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from'])),
+                            context['date'] = rules.And(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from'])),
                                                    rules.LessOrEqual(ABAC.unix_timestamp(req_json['context']['date']['to']))
                                                   )
                         elif 'from' in req_json['context']['date']:
