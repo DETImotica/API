@@ -143,6 +143,10 @@ def _simplify_attr_dict(xmldict):
                 res[key] = xmldict[key]
     return res
 
+@paranoid.on_invalid_session
+def paranoid_error_session():
+    return Response("ERROR: Invalid session (host does not match original request)", status=403)
+
 @cache.memoize(hash_method=sha3_256)
 def _get_attr(scope, at, ats):
     if not scope or scope not in _SUPPORTED_SCOPES:
