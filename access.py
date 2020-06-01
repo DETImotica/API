@@ -57,7 +57,7 @@ class ABAC(object):
                 
                 self._mongo_client = client
                 self._raw_policy_collection = client.get_database(config['mongodb']['db']).get_collection(config['mongodb']['raw_collection'])
-                self._storage = MongoStorage(client, config['mongodb']['collection'])
+                self._storage = EnfoldCache(MongoStorage(client, config['mongodb']['collection']), cache=MemoryStorage())
 
                 self._influxdb = DataDB()
                 self._pgdb = PGDB()
@@ -245,6 +245,7 @@ class PolicyManager(ABAC):
                           description=description
                          ))
 
+        self._storage.populate()
         return True, "OK"
 
     def update_policy(self, req):
@@ -256,6 +257,7 @@ class PolicyManager(ABAC):
         self.delete_policy(uid)
         self.create_policy(details, internal=True)
 
+        self._storage.populate()
         # inicial_policy = self._storage.get(details["id"]).to_json()
         # self._storage.delete(details["id"])
 
@@ -281,6 +283,8 @@ class PolicyManager(ABAC):
         '''Deletes a policy from the PRP, given UUID4-type ID.'''
         self._raw_policy_collection.delete_one({'uid': id})
         self._storage.delete(id)
+
+        self._storage.populate()
         return True, "OK"
 
 class PDP(ABAC):
