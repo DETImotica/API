@@ -177,14 +177,25 @@ class PolicyManager(ABAC):
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
                 
                 action = [rules.string.Equal(a) for a in req_json['actions']]
+
             ####
             # 'resource' is not mandatory, defaults to any element
             ####
-            resource = [rules.Any()]
+            resource = []
             if 'resources' in req_json:
                 if type(req_json['resources']) is not list:
                     return False, "ERROR: malformed access JSON - 'actions' must be a list."
-                resource = [{k : rules.string.Equal(s[k])} for s in req_json['resources'] for k in s]
+                for s in req_json['resources']:
+                    elem_res = {'sensor': rules.Any(), 'room': rules.Any(), 'type': rules.Any()}
+                    for k in s:
+                        elem_res[k] = rules.string.Equal(s[k])
+                
+                    #resource = [{k : rules.string.Equal(s[k])} for s in req_json['resources']]
+                    resource.append(elem_res)
+
+            if not resource:
+                resource = [rules.Any()]
+
             
             ####
             # 'context' is not mandatory, defaults to empty
@@ -333,6 +344,8 @@ class PDP(ABAC):
                 sensor_roomid = (self._pgdb.getSensor(resource_path[2]))['room_id']
 
                 resource.update({resource_path[1]: resource_path[2], 'type': sensor_type, 'room': sensor_roomid})
+                
+
                 #resource.update({resource_path[1]: resource_path[2]})
                 #details = self._pgdb.getSensor(resource_path[2])
                 #resource.update({'type': details['data']['type']})
