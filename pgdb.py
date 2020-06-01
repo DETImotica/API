@@ -209,11 +209,17 @@ class PGDB(object):
         result = cursor.fetchone()
 
         if result == None :
+<<<<<<< HEAD
             raise ValueError
         if result == "Null":
+=======
+            print("O sensor não existe")
+            raise ValueError
+        if result[0] == "Null" or result[0] == "None" or result[0] == None:
+>>>>>>> 9d6201f7ecf66826f221dc55d0c9b14d2b49dba5
             print("Está no armazem")
             return True
-        print("Está associado a uma sala ----> Sala: "+result)
+        print("Está associado a uma sala ----> Sala: "+str(result))
         return False
 
     def isSensorRoom(self, sensorid, roomid):
