@@ -22,7 +22,6 @@ import requests
 import datetime
 
 from flask import Flask, abort, flash, jsonify, make_response, redirect, Response, request, session, url_for
-from flask_caching import Cache
 from flask_paranoid import Paranoid
 from flasgger import Swagger, swag_from
 from flask.sessions import SecureCookieSessionInterface
@@ -39,6 +38,8 @@ from pgdb import PGDB
 
 from api_grafana import grafana
 from api_mobile import mobile
+
+from caching import cache, session_cache
 
 class ArgumentException(ValueError):
     pass
@@ -89,11 +90,6 @@ app.config['SWAGGER'] = {
 csrf = CSRFProtect(app)
 csrf.exempt(grafana)
 csrf.exempt(mobile)
-
-cache = Cache(app)
-session_cache = Cache(app, config={'CACHE_DIR': ".app_session_cache/",
-                                   'CACHE_DEFAULT_TIMEOUT': 3600*24*30
-                                  })
 
 swagger = Swagger(app)
 

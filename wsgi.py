@@ -4,7 +4,8 @@ import logging
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
-from api import app, cache, csrf, session_cache, APP_BASE_ENDPOINT, VERSION
+from api import app, csrf, APP_BASE_ENDPOINT, VERSION
+from caching import cache, session_cache
 
 def app_not_found(env, resp):
     return NotFound()(env, resp)
