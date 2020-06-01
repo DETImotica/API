@@ -469,7 +469,10 @@ def auth_verify():
     if fls.get('user') and fls.get('uuid'):
         if _validate_token(fls.get('uuid'), fls.get('user')):
             r = Response("OK", 200)
-            r.headers['User'] = fls.get('user')
+            if pgdb.isAdmin(fls.get('uuid')):
+                r.headers['User'] = 'admin'
+            else:
+                r.headers['User'] = fls.get('user')
             return r
     return ("NOK", 401)
 
