@@ -199,7 +199,7 @@ class PGDB(object):
         if result == None :
             print("O sensor não existe")
             raise ValueError
-        if result == "Null":
+        if result[0] == "Null" or result[0] == "None":
             print("Está no armazem")
             return True
         print("Está associado a uma sala ----> Sala: "+str(result))
