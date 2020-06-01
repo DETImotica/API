@@ -161,6 +161,15 @@ class PolicyManager(ABAC):
                         sub.update({k : rules.AnyIn(*s[k])})
                     else:
                         sub.update({k : rules.string.Equal(s[k])})
+
+                    if 'email' not in sub:
+                        sub.update({'email' : rules.Any()})
+                    if 'admin' not in sub:
+                        sub.update({'admin': rules.Falsy()})
+                    if 'student' not in sub:
+                        sub.update({'student': rules.Any()})
+                    if 'teacher' not in sub:
+                        sub.update({'teacher': rules.Any()})
                     
                 subject.append(sub)
         
@@ -187,33 +196,31 @@ class PolicyManager(ABAC):
             ####
             # 'context' is not mandatory, defaults to empty
             ####
-            context = {"hour": rules.Any(), "date": rules.Any()}
+            context = {"ip": rules.Any(), "hour": rules.Any(), "date": rules.Any()}
             if 'context' in req_json:
                 for k in req_json['context']:
                     if k == 'hour':
                         if 'from' in req_json['context']['hour'] and 'to' in req_json['context']['hour']:
                             context['hour'] = rules.And(rules.GreaterOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['from'])),
-                                                   rules.LessOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['to']))
-                                                  )
+                                                   rules.LessOrEqual(ABAC.daytime_in_s(time=req_json['context']['hour']['to'])))
                         else:
                             return False, "ERROR: Malformed access JSON - context's hours needs 'from' and 'to' attributes!"
                     elif k == 'date':
                         if 'from' in req_json['context']['date'] and 'to' in req_json['context']['date']:
                             context['date'] = rules.And(rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from'])),
-                                                   rules.LessOrEqual(ABAC.unix_timestamp(req_json['context']['date']['to']))
-                                                  )
+                                                   rules.LessOrEqual(ABAC.unix_timestamp(req_json['context']['date']['to'])))
                         elif 'from' in req_json['context']['date']:
                             context['date'] = rules.GreaterOrEqual(ABAC.unix_timestamp(req_json['context']['date']['from']))
                         elif 'to' in req_json['context']['date']:
                             context['date'] = rules.LessOrEqual(ABAC.unix_timestamp(req_json['context']['date']['to']))
                         else:
                             return False, "ERROR: Malformed access JSON - context's date needs 'from' and 'to' attributes!"
-                    elif k == 'ip':
-                        internal_rule = [rules.CIDR('10.0.0.0/8'), rules.CIDR('172.16.0.0/12'), rules.CIDR('192.168.0.0/16')]
-                        if req_json['context']['ip'].lower() == "internal":
-                            context['ip'] = internal_rule
-                        else:
-                            context['ip'] = rules.Not(rules.Or(internal_rule))
+                    # elif k == 'ip':
+                    #     internal_rule = [rules.CIDR('10.0.0.0/8'), rules.CIDR('172.16.0.0/12'), rules.CIDR('192.168.0.0/16')]
+                    #     if req_json['context']['ip'].lower() == "internal":
+                    #         context['ip'] = internal_rule
+                    #     else:
+                    #         context['ip'] = rules.Not(rules.Or(internal_rule))
                     else:
                         context[k] = rules.string.Equal(req_json['context'][k])
             ####
@@ -316,7 +323,7 @@ class PDP(ABAC):
                 resource.update(opt_resource)
             else:
                 return False
-        if resource_path[1] == 'type':
+        elif resource_path[1] == 'type':
             resource.update({resource_path[1]: resource_path[2]})
         elif resource_path[1] == 'room':
             resource.update({resource_path[1]: resource_path[2]})
