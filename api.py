@@ -488,12 +488,19 @@ def rooms():
     rooms = []
     for r in pgdb.getRooms():
         #Verificar quais salas podem ser acedidas pelo utilizador
-        if _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': r}):
+        if ( _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': r}) or at_least_one_sensor(r) ):
             rooms.append(r)
     
     dic.update(ids = rooms)
 
     return Response(json.dumps(dic), status=200, mimetype='application/json')
+
+def at_least_one_sensor(room):
+    for s in pgdb.getSensorsFromRoom(room):
+        if _pdp.get_http_req_access(request, user_attrs, {'sensor' : s}):
+            return True
+    return False
+
 
 
 @app.route("/room", methods=['POST'])
