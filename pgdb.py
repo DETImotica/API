@@ -330,12 +330,12 @@ class PGDB(object):
         return True
 
     # TODO pode rebentar
-    def getSensorsFromType(self, id):
+    def getSensorsFromType(self, tid):
         db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
         cursor = db_con.cursor()
         cursor.execute(
             "SELECT Sensor.id FROM (SELECT Nome FROM TipoSensor WHERE id = %s) as X JOIN Sensor ON Nome_TipoSensor = X.Nome;",
-            (str(id),))
+            (str(tid),))
         l_tuplos = cursor.fetchall()
         db_con.close()
 
