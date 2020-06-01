@@ -318,7 +318,8 @@ def login():
 
     resp_json = parse_qs(resp.content.decode("utf-8"))
     if not 'oauth_token' in resp_json or not 'oauth_token_secret' in resp_json:
-        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",                                       status=500                                                                                                          )
+        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",status=500)
+        
     session['_rt'] = (resp_json['oauth_token'][0], resp_json['oauth_token_secret'][0])
 
     return redirect(f"https://identity.ua.pt/oauth/authorize?oauth_token={session['_rt'][0]}&oauth_token_secret={session['_rt'][0]}", 302)
