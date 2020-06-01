@@ -498,6 +498,7 @@ def rooms():
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
 def at_least_one_sensor(room):
+    user_attrs = _get_user_attrs(session)
     for s in pgdb.getSensorsFromRoom(room):
         if _pdp.get_http_req_access(request, user_attrs, {'sensor' : s}):
             return True
