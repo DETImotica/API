@@ -339,8 +339,6 @@ class PDP(ABAC):
                     resource.update(opt_resource)
                     sensor_type = str(self._pgdb.getSensorTypeID(opt_resource['sensor']))
                     resource.update({'type': sensor_type})
-                else:
-                    return False
             # create type
             elif opt_resource:
                     resource.update(opt_resource)
@@ -357,14 +355,10 @@ class PDP(ABAC):
                         resource.update(opt_resource)
                         sensor_type = str(self._pgdb.getSensorTypeID(opt_resource['sensor']))
                         resource.update({'type': sensor_type})
-                    else:
-                        return False
                 elif resource_path[3] == "types":
                     # it's a type on a room (list get)
                     if opt_resource:
                         resource.update(opt_resource)
-                    else:
-                        return False
             elif opt_resource:
                 # it's an update or delete
                 resource.update(opt_resource)
