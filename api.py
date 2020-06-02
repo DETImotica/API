@@ -27,7 +27,7 @@ from flask_paranoid import Paranoid
 from flasgger import Swagger, swag_from
 from flask.sessions import SecureCookieSessionInterface
 from flask_wtf.csrf import CSRFProtect
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from hashlib import sha1, sha3_256, md5
 from calendar import timegm
 from requests_oauthlib import OAuth1
@@ -57,8 +57,8 @@ _SUPPORTED_SCOPES = ['uu', 'name',
 # Flask global vars
 app = Flask(__name__)
 
-grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
-CORS(grafana)
+#grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
+#CORS(grafana)
 
 app.config['JSON_SORT_KEYS'] = False
 app.config['SESSION_COOKIE_SECURE'] = False
@@ -90,11 +90,11 @@ app.config['SWAGGER'] = {
     'uiversion': 3
 }
 
-app.register_blueprint(grafana)
+#app.register_blueprint(grafana)
 app.register_blueprint(mobile)
 
 csrf = CSRFProtect(app)
-csrf.exempt(grafana)
+#csrf.exempt(grafana)
 csrf.exempt(mobile)
 
 swagger = Swagger(app)
@@ -185,6 +185,33 @@ def _validate_token(uuid, email):
     uu = _get_attr('uu', at, ats)
 
     return uu is not None and uuid == uu['iupi'] and email == uu['email']
+
+# return a dict with all relevant user attributes (on this iteration)- Given user id.
+def _get_user_attrc(userUUID):
+    at = session_cache.get(userUUID)
+    ats = session_cache.get(at)
+ 
+    #print(_get_attr('teacher_courses', at, ats))
+ 
+    res = {**_get_attr('uu', at, ats), **_get_attr('name', at, ats)}
+ 
+    st_info = _get_attr('student_info', at, ats)
+    if st_info:
+        st_info.pop('Foto', None)
+ 
+    res.update(st_info)
+ 
+    st_courses = _get_attr('student_courses', at, ats)
+    res.update(student=bool(st_courses))
+    if st_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasAluno']])
+ 
+    prof_courses = _get_attr('teacher_courses', at, ats)
+    res.update(teacher=bool(prof_courses))
+    if prof_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasDocente']])
+ 
+    return res
 
 # return a dict with all relevant user attributes (on this iteration).
 def _get_user_attrs(s):
@@ -1128,11 +1155,16 @@ def convert_to_time_ms(timestamp):
     except ValueError:
         return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').timetuple())
 
-@grafana.route('/', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/grafana', methods=['GET', 'POST', 'OPTIONS'])
+@csrf.exempt
+@cross_origin()
 def graf_root():
     return "OK", 200
 
-@grafana.route('/search', methods=['POST'])
+@admin_only
+@app.route('/grafana/search', methods=['POST'])
+@csrf.exempt
+@cross_origin()
 def graf_search():
     rooms= pgdb.getRooms()
     #rooms= [('1')]
@@ -1144,49 +1176,61 @@ def graf_search():
             res.append('Room'+pgdb.getRoom(r)['name']+'_'+str(s)+' ('+pgdb.getSensor(s)['data']['type']+')')
     return jsonify(res)
 
-@grafana.route('/query', methods=['POST'])
+@app.route('/grafana/query', methods=['POST'])
+@csrf.exempt
+@cross_origin()
 def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     req= request.json
-    targets= []
-    for t in req['targets']:
-        if 'target' in t.keys():
-            targets.append(((t['target']).split('_')[1]).split(' (')[0])
-    if targets == []:
-        return jsonify([])
-    res= []
-    for t in targets:
-        datapoints= []
-        try:
-            time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['from'])/1000))
-            time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['to'])/1000))
-        except ValueError:
-            # Alerts (range example: ['5m', 'now'])
-            if len((req['range']['to']).split('-')) > 1:
-                if 'm' in (req['range']['to']).split('-')[1]:
-                    time_end= datetime.utcnow()-timedelta(minutes= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
-                elif 'h' in (req['range']['to']).split('-')[1]:
-                    time_end= datetime.utcnow()-timedelta(hours= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
-                else:
-                    return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
-            else:
-                time_end= datetime.utcnow()
-            if 'm' in req['range']['from']:
-                time_st= time_end-timedelta(minutes= int(re.findall(r'\d+',req['range']['from'])[0]))
-            elif 'h' in req['range']['from']:
-                time_st= time_end-timedelta(hours= int(re.findall(r'\d+',req['range']['from'])[0]))
-            else:
-                return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
-        try:
-            query= json.loads(influxdb.query_avg(t,time_st, time_end,'30s'))
-        except ValueError:
-            return Response(json.dumps({"error_description": "There was a error obtaning data, try again later"}), status=500, mimetype='application/json')
-        datapoints= [[r['value'],convert_to_time_ms(r['time'])] for r in query['values'] if r['value']!= None]
-        res.append({"target":t,"datapoints":datapoints})    
-    return jsonify(res)
+    fls= _decode_flask_cookie (request.cookies.get('fls'))
+    if fls.get('user') and fls.get('uuid'):
+        if _validate_token (fls.get('uuid'), fls.get('user')):
+            user_attrs = _get_user_attrc(fls.get('uuid'))
+            targets= []
+            for t in req['targets']:
+                if 'target' in t.keys():
+                    sensor_id= ((t['target']).split('_')[1]).split(' (')[0]
+                    if _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
+                        targets.append(sensor_id)
+                        
+            if targets == []:
+                return jsonify([])
+            res= []
+            for t in targets:
+                datapoints= []
+                try:
+                    time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['from'])/1000))
+                    time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['to'])/1000))
+                except ValueError:
+                    # Alerts (range example: ['5m', 'now'])
+                    if len((req['range']['to']).split('-')) > 1:
+                        if 'm' in (req['range']['to']).split('-')[1]:
+                            time_end= datetime.utcnow()-timedelta(minutes= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
+                        elif 'h' in (req['range']['to']).split('-')[1]:
+                            time_end= datetime.utcnow()-timedelta(hours= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
+                        else:
+                            return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
+                    else:
+                        time_end= datetime.utcnow()
+                    if 'm' in req['range']['from']:
+                        time_st= time_end-timedelta(minutes= int(re.findall(r'\d+',req['range']['from'])[0]))
+                    elif 'h' in req['range']['from']:
+                        time_st= time_end-timedelta(hours= int(re.findall(r'\d+',req['range']['from'])[0]))
+                    else:
+                        return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
+                try:
+                    query= json.loads(influxdb.query_avg(t,time_st, time_end,'30s'))
+                except ValueError:
+                    return Response(json.dumps({"error_description": "There was an error obtaning data, try again later"}), status=500, mimetype='application/json')
+                datapoints= [[r['value'],convert_to_time_ms(r['time'])] for r in query['values'] if r['value']!= None]
+                res.append({"target":t,"datapoints":datapoints})    
+            return jsonify(res)
+    return ("NOK", 401)
 
-@grafana.route('/annotations', methods=['POST'])
+@app.route('/grafana/annotations', methods=['POST'])
+@csrf.exempt
+@cross_origin()
 def graf_annotations():
     # No annotations implemented
     return jsonify([])
