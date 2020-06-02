@@ -506,7 +506,7 @@ def auth_verify():
             # else:
             #     r.headers['User'] = fls.get('user')
             return r
-    return ("NOK", 403  )
+    return ("NOK", 403)
 
 ##################################################
 #---------Room data exposure endpoints-----------#
@@ -1154,16 +1154,20 @@ def getAllAccessPolicies():
 #Webhook that handles Grafana Alerts and sends notifications to FirebaseCM
 #ruleName should be sensor id, otherwise the notification will not work
 
+@admin_only
 @csrf.exempt
 @cross_origin()
 @app.route('/mobile/notifications', methods=['POST'])
 def mobile_notifications ():
     
     if not request.json:
+        print(1)
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+        
     
     req= request.json
     if not ('message' in req.keys() and 'title' in req.keys()):
+        print(2)
         return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')
     
     data= {}
@@ -1177,6 +1181,7 @@ def mobile_notifications ():
     except KeyError:
         topicName= 'control'
     except:
+        print(3)
         return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')                    
 
     if topicName!= 'control':
