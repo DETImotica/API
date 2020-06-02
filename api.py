@@ -1153,7 +1153,6 @@ def graf_search():
 
 @app.route('/grafana/query', methods=['POST'])
 @csrf.exempt
-@cross_origin()
 def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
