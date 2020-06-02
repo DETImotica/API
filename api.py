@@ -501,6 +501,8 @@ def auth_verify():
             r = Response("OK", 200)
             if pgdb.isAdmin(fls.get('uuid')):
                 r.headers['User'] = 'admin'
+            else:
+                return ("NOK", 401)
             # else:
             #     r.headers['User'] = fls.get('user')
             return r
