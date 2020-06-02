@@ -501,8 +501,8 @@ def auth_verify():
             r = Response("OK", 200)
             if pgdb.isAdmin(fls.get('uuid')):
                 r.headers['User'] = 'admin'
-            else:
-                r.headers['User'] = fls.get('user')
+            # else:
+            #     r.headers['User'] = fls.get('user')
             return r
     return ("NOK", 401)
 
@@ -734,6 +734,29 @@ def users_full():
     Get all users uuid from the database 
     '''
     return Response(json.dumps(pgdb.getUsersFull()), status=200,mimetype='application/json')
+
+@app.route("/user", methods=['POST'])
+@admin_only
+@swag_from('docs/users/user.yml', methods=['POST'])
+@csrf.exempt
+def user_id():
+    '''
+    [POST] Insert a new user on the system
+    '''
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+    user_details = request.json()
+
+    if "email" not in user_details or "admin" not in user_details :
+        return Response(json.dumps({"error_description": "User Details incomplete"}), status=400, mimetype='application/json')
+
+    # if pgdb.emailExists(user_details["email"]):
+    #     return Response(json.dumps({"error_description": "User Email already exists"}), status=400, mimetype='application/json')
+
+    user_id = uuid.uuid4()
+    pgdb.insertUser(user_id, user_details["email"], user_details["admin"])
+    return Response(json.dumps({"id": str(user_id)}), status=200, mimetype='application/json')
 
 @app.route("/user/<userid>", methods=['GET','POST','DELETE'])
 @admin_only
@@ -1153,20 +1176,17 @@ def graf_search():
 
 @app.route('/grafana/query', methods=['POST'])
 @csrf.exempt
+@cross_origin() 
 def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     req = request.json
     print(request.headers)
     print(request.cookies)
-    print(req)
-    print(request.args)
-
-    '''
-    reqLogin = requests.get('http://192.168.85.215/dashboards/api/user', verify=False)
+    reqLogin = requests.get('http://192.168.85.215/dashboards/api/user', cookies=request.cookies, verify=False)
+    print(reqLogin.text)
     if reqLogin.status_code == 200:
         reqLogin = reqLogin.json
-        print(reqLogin)
     else:
         return ("NOK", 401)    
     
@@ -1174,18 +1194,17 @@ def graf_query():
     isGrafanaAdmin= reqLogin ['isGrafanaAdmin']
 
     user_attrs= None
-        
+    
     if not isGrafanaAdmin:
         userUUID= pgdb.getUserIDFromEmail(login)['uuid']       
         user_attrs = _get_user_attrc(userUUID)
-    '''
-
+    
     targets= []
     for t in req['targets']:
         if 'target' in t.keys():
             sensor_id= ((t['target']).split('_')[1]).split(' (')[0]
-            #if isGrafanaAdmin or _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
-            targets.append(sensor_id)
+            if isGrafanaAdmin or _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
+                targets.append(sensor_id)
                 
     if targets == []:
         return jsonify([])
