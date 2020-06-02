@@ -502,11 +502,11 @@ def auth_verify():
             if pgdb.isAdmin(fls.get('uuid')):
                 r.headers['User'] = 'admin'
             else:
-                return ("NOK", 401)
+                return ("NOK", 403)
             # else:
             #     r.headers['User'] = fls.get('user')
             return r
-    return ("NOK", 401)
+    return ("NOK", 403)
 
 ##################################################
 #---------Room data exposure endpoints-----------#
