@@ -998,19 +998,11 @@ def types():
     Get all types of sensors for a user from the database
     '''
 
-    dic = {}
-    
     user_attrs = _get_user_attrs(session)
-                 
-    types = []
-    for t in pgdb.getAllSensorTypes():
-        #Verificar quais salas podem ser acedidas pelo utilizador
-        if ( _pdp.get_http_req_access(request, user_attrs, opt_resource={'type': t[0]}) or at_least_one_sensor_type(t[0]) ):
-            types.append(t)
-    
-    dic.update(ids = types)
 
-    return Response(json.dumps(dic), status=200, mimetype='application/json')
+    d = {"ids" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'type' : tuplo[0]}) or at_least_one_sensor_type(tuplo[0])]} 
+    return Response(json.dumps(d), status=200, mimetype='application/json')
+
 def at_least_one_sensor_type(t):
     user_attrs = _get_user_attrs(session)
     for s in pgdb.getSensorsFromType(t):

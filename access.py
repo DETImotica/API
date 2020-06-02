@@ -324,8 +324,14 @@ class PDP(ABAC):
 
         resource = {}
         if resource_path[1] in ['rooms', 'types', 'sensors']:
-            if opt_resource:
-                resource.update(opt_resource)
+            resource.update(opt_resource)
+            if opt_resource and 'sensor' in opt_resource:
+                sensor_type = str(self._pgdb.getSensorTypeID(opt_resource['sensor']))
+                try: 
+                    sensor_roomid = (self._pgdb.getSensor(opt_resource['sensor']))['room_id']
+                    resource.update({'type': sensor_type, 'room': sensor_roomid})
+                except TypeError:
+                    resource.update({'type': sensor_type})
             else:
                 return False
         elif resource_path[1] == 'type':
@@ -368,6 +374,7 @@ class PDP(ABAC):
                 # create sensor
                 if opt_resource:
                     resource.update(opt_resource)
+
 
             else:
                 # get the respective sensor's room and type attributes alongside its id (for any action)
