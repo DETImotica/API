@@ -1152,10 +1152,10 @@ def getAllAccessPolicies():
 #Webhook that handles Grafana Alerts and sends notifications to FirebaseCM
 #ruleName should be sensor id, otherwise the notification will not work
 
-@app.route('/notifications', methods=['POST'])
 @admin_only
 @csrf.exempt
 @cross_origin()
+@app.route('/mobile/notifications', methods=['POST'])
 def mobile_notifications ():
     
     if not request.json:
@@ -1178,25 +1178,7 @@ def mobile_notifications ():
     except:
         return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')                    
 
-    user_attrs= None
-        
-    if not isGrafanaAdmin:
-        userUUID= pgdb.getUserIDFromEmail(login)['uuid']       
-        user_attrs = _get_user_attrc(userUUID)
-    '''
-
-    targets= []
-    for t in req['targets']:
-        if 'target' in t.keys():
-            sensor_id= ((t['target']).split('_')[1]).split(' (')[0]
-            #if isGrafanaAdmin or _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
-            targets.append(sensor_id)
-                
-    if targets == []:
-        return jsonify([])
-    res= []
-    for t in targets:
-        datapoints= []
+    if topicName!= 'control':
         try:
             pgdb.isSensorFree(topicName)
             sensorInfo= pgdb.getSensor(topicName)
