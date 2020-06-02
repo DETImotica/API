@@ -1153,7 +1153,7 @@ def convert_to_time_ms(timestamp):
     except ValueError:
         return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').timetuple())
 
-@app.route('/grafana/', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/grafana', methods=['GET', 'POST', 'OPTIONS'])
 @csrf.exempt
 @cross_origin()
 def graf_root():
