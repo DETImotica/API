@@ -54,11 +54,12 @@ _SUPPORTED_SCOPES = ['uu', 'name',
                      'student_info', 'student_schedule', 'student_courses',
                      'teacher_schedule', 'teacher_courses']
 
+# Flask global vars
+app = Flask(__name__)
+
 grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
 CORS(grafana)
 
-# Flask global vars
-app = Flask(__name__)
 app.register_blueprint(grafana)
 app.register_blueprint(mobile)
 
