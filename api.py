@@ -1186,6 +1186,7 @@ def graf_query():
         fls= _decode_flask_cookie(cookie)
     else:
         fls=session
+    print(request.json)
     if fls.get('user') and fls.get('uuid'):
         if _validate_token (fls.get('uuid'), fls.get('user')):
             user_attrs = _get_user_attrc(fls.get('uuid'))
