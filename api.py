@@ -876,11 +876,11 @@ def new_sensor():
     try:
         url = "http://192.168.85.112/device/standalone"
         data_influx = {"tenant-id": "detimotic", "device-id" : str(id), "password": _hono_register_pw}
-        response = requests.post(url, headers={"Content-Type": "application/json"}, auth=(_hono_user_name, _hono_user_pw), timeout=5, data=json.dumps(data_influx))
-        if not response or response.status_code != 200:
-            return Response(json.dumps({"error_description": "Connection to influx error"}), status=500, mimetype='application/json')
+        response = requests.post(url, headers={"Content-Type": "application/json"}, auth=(_hono_user_name, _hono_user_pw),timeout=5, data=json.dumps(data_influx))
+        if not response or response.status_code != 201:
+            return Response(json.dumps({"error_description": "Connection to hono error"}), status=500, mimetype='application/json')
     except:
-        return Response(json.dumps({"error_description": "Connection to influx timeout"}), status=408, mimetype='application/json')
+        return Response(json.dumps({"error_description": "Connection to hono timeout"}), status=408, mimetype='application/json')
 
     pgdb.createSensor(id, details)
     sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + str(id), _aes_gw_salt, 16, int(_gw_kdf_iter), None)).decode('utf-8')
@@ -960,8 +960,6 @@ def sensor_description_admin(sensorid):
             return Response(json.dumps({"id": sensorid}), status=200, mimetype='application/json')
         except:
             return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=404, mimetype='application/json')
-
-    return jsonify(RESP_501), 501
 
 @app.route("/sensor/<sensorid>/key", methods=['GET'])
 @admin_only
