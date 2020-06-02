@@ -1183,7 +1183,7 @@ def graf_query():
     req = request.json
     print(request.headers)
     print(request.cookies)
-    reqLogin = requests.get('http:/192.168.85/215/dashboards/api/user', verify=False)
+    reqLogin = requests.get('http://192.168.85.215/dashboards/api/user', verify=False)
     print(reqLogin.text)
     if reqLogin.status_code == 200:
         reqLogin = reqLogin.json
