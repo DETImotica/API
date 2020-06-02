@@ -365,9 +365,15 @@ class PDP(ABAC):
                     # it's a type on a room (list get)
                     if opt_resource:
                         resource.update(opt_resource)
+            elif len(resource_path) == 3:
+                    if opt_resource:
+                        resource.update(opt_resource)
+                        sensor_type = str(self._pgdb.getSensorTypeID(opt_resource['sensor']))
+                        resource.update({'type': sensor_type})
             elif opt_resource:
                 # it's an update or delete
                 resource.update(opt_resource)
+
 
         elif resource_path[1] == 'sensor':
             if len(resource_path) < 3:
