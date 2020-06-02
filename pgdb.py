@@ -373,6 +373,13 @@ class PGDB(object):
         db_con.close()
         return {"email": tuplo[0], "admin": tuplo[1]}
 
+    def getUserIDFromEmail(self, email):
+        db_con = psycopg2.connect(host=self.url, port=self.port, user=self.user, password=self._pw, dbname=self.db)
+        cursor = db_con.cursor()
+        cursor.execute("SELECT uuid FROM Utilizador WHERE email = %s;", (str(email),))
+        tuplo = cursor.fetchone()
+        db_con.close()
+        return {"uuid": tuplo[0]}
 
     #TODO pode rebentar
     def insertUser(self, userid, email, admin=False):
