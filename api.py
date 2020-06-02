@@ -1181,7 +1181,7 @@ def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     req = request.json
-    reqLogin = requests.get(request.host_url()+'dashboards/api/user')
+    reqLogin = requests.get(request.host_url+'dashboards/api/user')
     if reqLogin.status_code == 200:
         reqLogin = reqLogin.json
     else:
@@ -1190,8 +1190,11 @@ def graf_query():
     login= reqLogin['login']
     isGrafanaAdmin= reqLogin ['isGrafanaAdmin']
 
-    userUUID= pgdb.getUserIDFromEmail(login)       
-    user_attrs = _get_user_attrc(userUUID)
+    user_attrs= None
+    
+    if not isGrafanaAdmin:
+        userUUID= pgdb.getUserIDFromEmail(login)['uuid']       
+        user_attrs = _get_user_attrc(userUUID)
     
     targets= []
     for t in req['targets']:
