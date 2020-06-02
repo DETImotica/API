@@ -335,8 +335,6 @@ class PDP(ABAC):
                     resource.update({'type': sensor_type, 'room': sensor_roomid})
                 except TypeError:
                     resource.update({'type': sensor_type})
-            else:
-                return False
         elif resource_path[1] == 'type':
             # get/modify/delete type
             if len(resource_path) >= 3:
