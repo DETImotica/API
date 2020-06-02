@@ -29,9 +29,9 @@ responses:
     description: Returns the new Type's name created
     schema:
       properties:
-        name:
-          type: string
-          example: 'Temperatura'
+        id:
+          type: uuid
+          example: 'f62a5b99-17cc-4df0-969e-0a55ba3cf344'
   '400':
     enum: ["New Data Type Details Incomplete", "One of the detail fields has more than 50 characters", "This data type already exists"]
     description: >

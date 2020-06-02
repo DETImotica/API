@@ -18,17 +18,20 @@ parameters:
     description: Description of the sensor type
     schema:
       properties:
+        name:
+          type: string
+          example: 'Temperatura'
         description:
           type: string
           example: 'Valor médio da Temperatura ao redor do Sensor'
 responses:
   '200':
-    description: Returns the new Type's name changed
+    description: Returns the new Type's id changed
     schema:
       properties:
-        name:
-          type: string
-          example: 'Temperatura'
+        id:
+          type: uuid
+          example: 'f62a5b99-17cc-4df0-969e-0a55ba3cf344'
   '400':
     description: Error as a malformed request 
     schema:

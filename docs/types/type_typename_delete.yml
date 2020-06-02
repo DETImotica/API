@@ -15,9 +15,9 @@ responses:
     description: Returns the name of the deleted type
     schema:
       properties:
-        name:
-          type: string
-          example: 'Temperatura'
+        id:
+          type: uuid
+          example: 'f62a5b99-17cc-4df0-969e-0a55ba3cf344'
   '400':
     description: Error as is not allow to delete that type 
     schema:

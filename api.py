@@ -735,29 +735,6 @@ def users_full():
     '''
     return Response(json.dumps(pgdb.getUsersFull()), status=200,mimetype='application/json')
 
-@app.route("/user", methods=['POST'])
-@admin_only
-@swag_from('docs/users/user.yml', methods=['POST'])
-@csrf.exempt
-def user_id():
-    '''
-    [POST] Insert a new user on the system
-    '''
-    if not request.json:
-        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
-
-    user_details = request.json()
-
-    if "email" not in user_details or "admin" not in user_details :
-        return Response(json.dumps({"error_description": "User Details incomplete"}), status=400, mimetype='application/json')
-
-    # if pgdb.emailExists(user_details["email"]):
-    #     return Response(json.dumps({"error_description": "User Email already exists"}), status=400, mimetype='application/json')
-
-    user_id = uuid.uuid4()
-    pgdb.insertUser(user_id, user_details["email"], user_details["admin"])
-    return Response(json.dumps({"id": str(user_id)}), status=200, mimetype='application/json')
-
 @app.route("/user/<userid>", methods=['GET','POST','DELETE'])
 @admin_only
 @swag_from('docs/users/users_userid_get.yml', methods=['GET'])

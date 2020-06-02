@@ -1,17 +1,16 @@
 Get all types of sensors for a user from the database
 ---
 tags:
-- Sensors
+- Types
 produces:
 - application/json
 responses:
   '200':
-    description: Returns all sensor types currently registered on the system that are available for the user
+    description: Returns all sensor types ids currently registered on the system that are available for the user
     schema:
       properties:
         types:
           type: array
           items:
-            type: string
-            description: Type name
-            example: 'Temperatura'
+            type: uuid
+            example: 'f62a5b99-17cc-4df0-969e-0a55ba3cf344'
