@@ -1172,10 +1172,9 @@ def mobile_notifications ():
     topicName= ''
     
     try:
-        if len(req['evalMatches']) == 1 and 'metric' in ((req['evalMatches'][0]).keys()):
+        if 'metric' in ((req['evalMatches'][0]).keys()):
             topicName= (req['evalMatches'][0])['metric']
         else:
-            print(6)
             return Response(json.dumps({"error_description" : "Invalid request. Can only send a notification to a single sensor topic"}), status=400, mimetype='application/json')        
     except KeyError:
         topicName= 'control'
@@ -1218,7 +1217,6 @@ def mobile_notifications ():
     if response.status_code == 200:
         return Response(json.dumps({}), status=200, mimetype='application/json')   
     else:
-        print(5)
         return Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
 
 if __name__ == "__main__":
