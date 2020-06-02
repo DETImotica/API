@@ -1184,6 +1184,7 @@ def graf_query():
     print(request.headers)
     print(request.cookies)
     reqLogin = requests.get(request.host_url+'dashboards/api/user', verify=False)
+    print(reqLogin.text)
     if reqLogin.status_code == 200:
         reqLogin = reqLogin.json
     else:
