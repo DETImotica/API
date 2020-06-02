@@ -1158,8 +1158,12 @@ def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     req = request.json
-    print(request.headers)
-    print(request.cookies)
+    print("Headers: "+request.headers)
+    print("Cookies: "+request.cookies)
+    print("Request: "+req)
+    print("Args: "+request.args)
+    
+    '''
     reqLogin = requests.get('http://192.168.85.215/dashboards/api/user', verify=False)
     if reqLogin.status_code == 200:
         reqLogin = reqLogin.json
@@ -1171,17 +1175,18 @@ def graf_query():
     isGrafanaAdmin= reqLogin ['isGrafanaAdmin']
 
     user_attrs= None
-    
+        
     if not isGrafanaAdmin:
         userUUID= pgdb.getUserIDFromEmail(login)['uuid']       
         user_attrs = _get_user_attrc(userUUID)
-    
+    '''
+
     targets= []
     for t in req['targets']:
         if 'target' in t.keys():
             sensor_id= ((t['target']).split('_')[1]).split(' (')[0]
-            if isGrafanaAdmin or _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
-                targets.append(sensor_id)
+            #f isGrafanaAdmin or _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
+            targets.append(sensor_id)
                 
     if targets == []:
         return jsonify([])
