@@ -506,7 +506,7 @@ def auth_verify():
             # else:
             #     r.headers['User'] = fls.get('user')
             return r
-    return ("NOK", 403)
+    return ("NOK", 403  )
 
 ##################################################
 #---------Room data exposure endpoints-----------#
@@ -1074,7 +1074,7 @@ def typesFromName(id):
         return Response(json.dumps({"error_description": "The type id sent does not exist"}), status=400, mimetype='application/json')
 
     if not _pdp.get_http_req_access(request, user_attrs):
-        Response(json.dumps({"error description": f"Access denied to type of sensor {id}. Talk to an administrator."}), status=401, mimetype='application/json')
+        return Response(json.dumps({"error description": f"Access denied to type of sensor {id}. Talk to an administrator."}), status=401, mimetype='application/json')
 
     return Response(json.dumps(pgdb.getSensorType(id)), status=200, mimetype='application/json')
 
