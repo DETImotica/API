@@ -1181,55 +1181,57 @@ def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     req = request.json
-    cookie = request.cookies.get('fls')
-    if cookie:
-        fls= _decode_flask_cookie(cookie)
+    reqLogin = requests.get(request.host_url()+'dashboards/api/user')
+    if reqLogin.status_code == 200:
+        reqLogin = reqLogin.json
     else:
-        fls=session
-    print(request.json)
-    if fls.get('user') and fls.get('uuid'):
-        if _validate_token (fls.get('uuid'), fls.get('user')):
-            user_attrs = _get_user_attrc(fls.get('uuid'))
-            targets= []
-            for t in req['targets']:
-                if 'target' in t.keys():
-                    sensor_id= ((t['target']).split('_')[1]).split(' (')[0]
-                    if _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
-                        targets.append(sensor_id)
-                        
-            if targets == []:
-                return jsonify([])
-            res= []
-            for t in targets:
-                datapoints= []
-                try:
-                    time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['from'])/1000))
-                    time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['to'])/1000))
-                except ValueError:
-                    # Alerts (range example: ['5m', 'now'])
-                    if len((req['range']['to']).split('-')) > 1:
-                        if 'm' in (req['range']['to']).split('-')[1]:
-                            time_end= datetime.utcnow()-timedelta(minutes= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
-                        elif 'h' in (req['range']['to']).split('-')[1]:
-                            time_end= datetime.utcnow()-timedelta(hours= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
-                        else:
-                            return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
-                    else:
-                        time_end= datetime.utcnow()
-                    if 'm' in req['range']['from']:
-                        time_st= time_end-timedelta(minutes= int(re.findall(r'\d+',req['range']['from'])[0]))
-                    elif 'h' in req['range']['from']:
-                        time_st= time_end-timedelta(hours= int(re.findall(r'\d+',req['range']['from'])[0]))
-                    else:
-                        return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
-                try:
-                    query= json.loads(influxdb.query_avg(t,time_st, time_end,'30s'))
-                except ValueError:
-                    return Response(json.dumps({"error_description": "There was an error obtaning data, try again later"}), status=500, mimetype='application/json')
-                datapoints= [[r['value'],convert_to_time_ms(r['time'])] for r in query['values'] if r['value']!= None]
-                res.append({"target":t,"datapoints":datapoints})    
-            return jsonify(res)
-    return ("NOK", 401)
+        return ("NOK", 401)    
+    
+    login= reqLogin['login']
+    isGrafanaAdmin= reqLogin ['isGrafanaAdmin']
+
+    userUUID= pgdb.getUserIDFromEmail(login)       
+    user_attrs = _get_user_attrc(userUUID)
+    
+    targets= []
+    for t in req['targets']:
+        if 'target' in t.keys():
+            sensor_id= ((t['target']).split('_')[1]).split(' (')[0]
+            if isGrafanaAdmin or _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
+                targets.append(sensor_id)
+                
+    if targets == []:
+        return jsonify([])
+    res= []
+    for t in targets:
+        datapoints= []
+        try:
+            time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['from'])/1000))
+            time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['to'])/1000))
+        except ValueError:
+            # Alerts (range example: ['5m', 'now'])
+            if len((req['range']['to']).split('-')) > 1:
+                if 'm' in (req['range']['to']).split('-')[1]:
+                    time_end= datetime.utcnow()-timedelta(minutes= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
+                elif 'h' in (req['range']['to']).split('-')[1]:
+                    time_end= datetime.utcnow()-timedelta(hours= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
+                else:
+                    return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
+            else:
+                time_end= datetime.utcnow()
+            if 'm' in req['range']['from']:
+                time_st= time_end-timedelta(minutes= int(re.findall(r'\d+',req['range']['from'])[0]))
+            elif 'h' in req['range']['from']:
+                time_st= time_end-timedelta(hours= int(re.findall(r'\d+',req['range']['from'])[0]))
+            else:
+                return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
+        try:
+            query= json.loads(influxdb.query_avg(t,time_st, time_end,'30s'))
+        except ValueError:
+            return Response(json.dumps({"error_description": "There was an error obtaning data, try again later"}), status=500, mimetype='application/json')
+        datapoints= [[r['value'],convert_to_time_ms(r['time'])] for r in query['values'] if r['value']!= None]
+        res.append({"target":t,"datapoints":datapoints})    
+    return jsonify(res)
 
 @app.route('/grafana/annotations', methods=['POST'])
 @csrf.exempt
