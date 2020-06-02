@@ -162,6 +162,9 @@ class PolicyManager(ABAC):
                         sub.update({k : rules.AnyIn(*s[k])})
                     else:
                         sub.update({k : rules.string.Equal(s[k])})
+
+                    if 'admin' not in sub:
+                        sub.update({'admin': rules.Falsy()})
                     
                 subject.append(sub)
         
