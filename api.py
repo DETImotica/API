@@ -14,6 +14,7 @@ import time
 import json
 import uuid
 import xmltodict
+import re
 
 from collections import OrderedDict
 from functools import wraps
@@ -21,22 +22,23 @@ from urllib.parse import parse_qs
 import requests
 import datetime
 
-from flask import Flask, abort, flash, jsonify, make_response, redirect, Response, request, session, url_for
+from flask import Blueprint ,Flask, abort, flash, jsonify, make_response, redirect, Response, request, session, url_for
 from flask_paranoid import Paranoid
 from flasgger import Swagger, swag_from
 from flask.sessions import SecureCookieSessionInterface
 from flask_wtf.csrf import CSRFProtect
+from flask_cors import CORS
 from hashlib import sha1, sha3_256, md5
+from calendar import timegm
 from requests_oauthlib import OAuth1
 from Crypto.Protocol.KDF import PBKDF2
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from access import PDP, PolicyManager
 from datadb import DataDB
 from pgdb import PGDB
 
-from api_grafana import grafana
 from api_mobile import mobile
 
 from caching import cache, session_cache
@@ -51,6 +53,9 @@ TITLE = 'DETImotica API'
 _SUPPORTED_SCOPES = ['uu', 'name',
                      'student_info', 'student_schedule', 'student_courses',
                      'teacher_schedule', 'teacher_courses']
+
+grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
+CORS(grafana)
 
 # Flask global vars
 app = Flask(__name__)
@@ -1111,6 +1116,80 @@ def getAllAccessPolicies():
     if not request.json:
         return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')
     return Response(json.dumps(_access_mgr.get_policies(request)), status=200, mimetype='application/json')
+
+####################################################
+##            Grafana                             ##
+####################################################
+
+def convert_to_time_ms(timestamp):
+    try:
+        return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ').timetuple())
+    except ValueError:
+        return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').timetuple())
+
+@grafana.route('/', methods=['GET', 'POST', 'OPTIONS'])
+def graf_root():
+    return "OK", 200
+
+@grafana.route('/search', methods=['POST'])
+def graf_search():
+    rooms= pgdb.getRooms()
+    #rooms= [('1')]
+    res= []
+    for r in rooms:
+        sensors= pgdb.getSensorsFromRoom(r)
+        #sensors= [uuid.UUID('55fbf7d0-cc47-4642-9290-a493d383ad8c'),uuid.UUID('e7cdb45b-e370-4d74-bb3a-8ebe7527e458')]
+        for s in sensors:
+            res.append('Room'+pgdb.getRoom(r)['name']+'_'+str(s)+' ('+pgdb.getSensor(s)['data']['type']+')')
+    return jsonify(res)
+
+@grafana.route('/query', methods=['POST'])
+def graf_query():
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+    req= request.json
+    targets= []
+    for t in req['targets']:
+        if 'target' in t.keys():
+            targets.append(((t['target']).split('_')[1]).split(' (')[0])
+    if targets == []:
+        return jsonify([])
+    res= []
+    for t in targets:
+        datapoints= []
+        try:
+            time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['from'])/1000))
+            time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['to'])/1000))
+        except ValueError:
+            # Alerts (range example: ['5m', 'now'])
+            if len((req['range']['to']).split('-')) > 1:
+                if 'm' in (req['range']['to']).split('-')[1]:
+                    time_end= datetime.utcnow()-timedelta(minutes= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
+                elif 'h' in (req['range']['to']).split('-')[1]:
+                    time_end= datetime.utcnow()-timedelta(hours= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
+                else:
+                    return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
+            else:
+                time_end= datetime.utcnow()
+            if 'm' in req['range']['from']:
+                time_st= time_end-timedelta(minutes= int(re.findall(r'\d+',req['range']['from'])[0]))
+            elif 'h' in req['range']['from']:
+                time_st= time_end-timedelta(hours= int(re.findall(r'\d+',req['range']['from'])[0]))
+            else:
+                return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
+        try:
+            query= json.loads(influxdb.query_avg(t,time_st, time_end,'30s'))
+        except ValueError:
+            return Response(json.dumps({"error_description": "There was a error obtaning data, try again later"}), status=500, mimetype='application/json')
+        datapoints= [[r['value'],convert_to_time_ms(r['time'])] for r in query['values'] if r['value']!= None]
+        res.append({"target":t,"datapoints":datapoints})    
+    return jsonify(res)
+
+@grafana.route('/annotations', methods=['POST'])
+def graf_annotations():
+    # No annotations implemented
+    return jsonify([])
+
 
 if __name__ == "__main__":
     try:
