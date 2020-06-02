@@ -1161,13 +1161,11 @@ def getAllAccessPolicies():
 def mobile_notifications ():
     
     if not request.json:
-        print(1)
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
         
     
     req= request.json
     if not ('message' in req.keys() and 'title' in req.keys()):
-        print(2)
         return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')
     
     data= {}
@@ -1177,11 +1175,11 @@ def mobile_notifications ():
         if len(req['evalMatches']) == 1 and 'metric' in ((req['evalMatches'][0]).keys()):
             topicName= (req['evalMatches'][0])['metric']
         else:
+            print(6)
             return Response(json.dumps({"error_description" : "Invalid request. Can only send a notification to a single sensor topic"}), status=400, mimetype='application/json')        
     except KeyError:
         topicName= 'control'
     except:
-        print(3)
         return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')                    
 
     if topicName!= 'control':
@@ -1220,6 +1218,7 @@ def mobile_notifications ():
     if response.status_code == 200:
         return Response(json.dumps({}), status=200, mimetype='application/json')   
     else:
+        print(5)
         return Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
 
 if __name__ == "__main__":
