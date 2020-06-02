@@ -1163,8 +1163,8 @@ def mobile_notifications ():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
         
-    
     req= request.json
+    print(req)
     if not ('message' in req.keys() and 'title' in req.keys()):
         return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')
     
