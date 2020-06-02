@@ -39,7 +39,7 @@ from access import PDP, PolicyManager
 from datadb import DataDB
 from pgdb import PGDB
 
-from api_mobile import mobile
+from api_grafana import grafana
 
 from caching import cache, session_cache
 
@@ -90,12 +90,12 @@ app.config['SWAGGER'] = {
     'uiversion': 3
 }
 
-#app.register_blueprint(grafana)
-app.register_blueprint(mobile)
+app.register_blueprint(grafana)
+#app.register_blueprint(mobile)
 
 csrf = CSRFProtect(app)
-#csrf.exempt(grafana)
-csrf.exempt(mobile)
+csrf.exempt(grafana)
+#csrf.exempt(mobile)
 
 swagger = Swagger(app)
 
@@ -1146,108 +1146,77 @@ def getAllAccessPolicies():
     return Response(json.dumps(_access_mgr.get_policies(request)), status=200, mimetype='application/json')
 
 ####################################################
-##            Grafana                             ##
+##            Mobile                              ##
 ####################################################
 
-def convert_to_time_ms(timestamp):
-    try:
-        return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ').timetuple())
-    except ValueError:
-        return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').timetuple())
-
-@app.route('/grafana/', methods=['GET', 'POST', 'OPTIONS'])
-@csrf.exempt
-@cross_origin()
-def graf_root():
-    return "OK", 200
+# Push Notifications
+#@admin_only
+#Webhook that handles Grafana Alerts and sends notifications to FirebaseCM
+#ruleName should be sensor id, otherwise the notification will not work
 
 @admin_only
-@app.route('/grafana/search', methods=['POST'])
 @csrf.exempt
 @cross_origin()
-def graf_search():
-    rooms= pgdb.getRooms()
-    #rooms= [('1')]
-    res= []
-    for r in rooms:
-        sensors= pgdb.getSensorsFromRoom(r)
-        #sensors= [uuid.UUID('55fbf7d0-cc47-4642-9290-a493d383ad8c'),uuid.UUID('e7cdb45b-e370-4d74-bb3a-8ebe7527e458')]
-        for s in sensors:
-            res.append('Room'+pgdb.getRoom(r)['name']+'_'+str(s)+' ('+pgdb.getSensor(s)['data']['type']+')')
-    return jsonify(res)
-
-@app.route('/grafana/query', methods=['POST'])
-@csrf.exempt
-@cross_origin() 
-def graf_query():
+@app.route('/mobile/notifications', methods=['POST'])
+def mobile_notifications ():
+    
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
-    req = request.json
-    print(request.headers)
-    print(request.cookies)
-    reqLogin = requests.get('http://192.168.85.215/dashboards/api/user', cookies=request.cookies, verify=False)
-    print(reqLogin.text)
-    if reqLogin.status_code == 200:
-        reqLogin = reqLogin.json
+    
+    req= request.json
+    if not ('message' in req.keys() and 'title' in req.keys()):
+        return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')
+    
+    data= {}
+    topicName= ''
+    
+    try:
+        if len(req['evalMatches']) == 1 and 'metric' in ((req['evalMatches'][0]).keys()):
+            topicName= (req['evalMatches'][0])['metric']
+        else:
+            return Response(json.dumps({"error_description" : "Invalid request. Can only send a notification to a single sensor topic"}), status=400, mimetype='application/json')        
+    except KeyError:
+        topicName= 'control'
+    except:
+        return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')                    
+
+    if topicName!= 'control':
+        try:
+            pgdb.isSensorFree(topicName)
+            sensorInfo= pgdb.getSensor(topicName)
+            data['id']= topicName
+            data['room']= sensorInfo['room_id']
+            data['type']= sensorInfo['data']['type'] 
+        except:
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+
+    try: 
+        with open('.secret_config.json') as json_file:
+            secret= json.load(json_file)
+    except:
+        # Webhook handle is ok, notifcation is not sent
+        return Response(json.dumps({"error_description" : "Could not open or locate config file"}), status=500, mimetype='application/json')
+
+    #Message Payload
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'key=' + secret['key'],
+    }
+
+    body = {
+        'notification': {'title': req['title'],
+                         'body': req['message']
+                        },
+        'to': '/topics/' + topicName,
+        'data': data
+    }
+    # Send a notification to the devices subscribed to the provided topic
+    response = requests.post("https://fcm.googleapis.com/fcm/send",headers = headers, data=json.dumps(body))
+    
+    if response.status_code == 200:
+        return Response(json.dumps({}), status=200, mimetype='application/json')   
     else:
-        return ("NOK", 401)    
-    
-    login= reqLogin['login']
-    isGrafanaAdmin= reqLogin ['isGrafanaAdmin']
-
-    user_attrs= None
-    
-    if not isGrafanaAdmin:
-        userUUID= pgdb.getUserIDFromEmail(login)['uuid']       
-        user_attrs = _get_user_attrc(userUUID)
-    
-    targets= []
-    for t in req['targets']:
-        if 'target' in t.keys():
-            sensor_id= ((t['target']).split('_')[1]).split(' (')[0]
-            if isGrafanaAdmin or _pdp.get_http_req_access(request, user_attrs, {'sensor' : sensor_id}):
-                targets.append(sensor_id)
-                
-    if targets == []:
-        return jsonify([])
-    res= []
-    for t in targets:
-        datapoints= []
-        try:
-            time_st= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['from'])/1000))
-            time_end= time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(req['range']['to'])/1000))
-        except ValueError:
-            # Alerts (range example: ['5m', 'now'])
-            if len((req['range']['to']).split('-')) > 1:
-                if 'm' in (req['range']['to']).split('-')[1]:
-                    time_end= datetime.utcnow()-timedelta(minutes= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
-                elif 'h' in (req['range']['to']).split('-')[1]:
-                    time_end= datetime.utcnow()-timedelta(hours= int(re.findall(r'\d+',(req['range']['to']).split('-')[1])[0]))
-                else:
-                    return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')
-            else:
-                time_end= datetime.utcnow()
-            if 'm' in req['range']['from']:
-                time_st= time_end-timedelta(minutes= int(re.findall(r'\d+',req['range']['from'])[0]))
-            elif 'h' in req['range']['from']:
-                time_st= time_end-timedelta(hours= int(re.findall(r'\d+',req['range']['from'])[0]))
-            else:
-                return Response(json.dumps({"error_description": "Invalid time format"}), status=400, mimetype='application/json')    
-        try:
-            query= json.loads(influxdb.query_avg(t,time_st, time_end,'30s'))
-        except ValueError:
-            return Response(json.dumps({"error_description": "There was an error obtaning data, try again later"}), status=500, mimetype='application/json')
-        datapoints= [[r['value'],convert_to_time_ms(r['time'])] for r in query['values'] if r['value']!= None]
-        res.append({"target":t,"datapoints":datapoints})    
-    return jsonify(res)
-
-@app.route('/grafana/annotations', methods=['POST'])
-@csrf.exempt
-@cross_origin()
-def graf_annotations():
-    # No annotations implemented
-    return jsonify([])
-
+        return Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
 
 if __name__ == "__main__":
     try:
