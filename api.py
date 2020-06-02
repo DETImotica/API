@@ -1158,7 +1158,7 @@ def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     req = request.json
-    print(equest.headers)
+    print(request.headers)
     print(request.cookies)
     print(req)
     print(request.args)
