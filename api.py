@@ -1153,7 +1153,7 @@ def convert_to_time_ms(timestamp):
     except ValueError:
         return 1000 * timegm(datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%SZ').timetuple())
 
-@app.route('/grafana', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/grafana/', methods=['GET', 'POST', 'OPTIONS'])
 @csrf.exempt
 @cross_origin()
 def graf_root():
@@ -1183,7 +1183,7 @@ def graf_query():
     req = request.json
     print(request.headers)
     print(request.cookies)
-    reqLogin = requests.get('http://192.168.85/215/dashboards/api/user', verify=False)
+    reqLogin = requests.get('http:/192.168.85/215/dashboards/api/user', verify=False)
     print(reqLogin.text)
     if reqLogin.status_code == 200:
         reqLogin = reqLogin.json
