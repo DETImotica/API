@@ -1154,7 +1154,6 @@ def getAllAccessPolicies():
 #Webhook that handles Grafana Alerts and sends notifications to FirebaseCM
 #ruleName should be sensor id, otherwise the notification will not work
 
-@admin_only
 @csrf.exempt
 @cross_origin()
 @app.route('/mobile/notifications', methods=['POST'])
