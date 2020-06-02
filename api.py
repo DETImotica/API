@@ -1180,9 +1180,13 @@ def graf_search():
 def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
-    req= request.json
+    req = request.json
+    cookie = request.cookies.get('fls')
+    if cookie:
+        fls= _decode_flask_cookie(cookie)
+    else:
+        fls=session
     print(request.headers)
-    fls= _decode_flask_cookie (request.cookies.get('fls'))
     if fls.get('user') and fls.get('uuid'):
         if _validate_token (fls.get('uuid'), fls.get('user')):
             user_attrs = _get_user_attrc(fls.get('uuid'))
