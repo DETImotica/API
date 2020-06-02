@@ -1005,7 +1005,7 @@ def types():
     types = []
     for t in pgdb.getAllSensorTypes():
         #Verificar quais salas podem ser acedidas pelo utilizador
-        if ( _pdp.get_http_req_access(request, user_attrs, opt_resource={'type': t}) or at_least_one_sensor(t) ):
+        if ( _pdp.get_http_req_access(request, user_attrs, opt_resource={'type': t[0]}) or at_least_one_sensor_type(t[0]) ):
             types.append(t)
     
     dic.update(ids = types)
