@@ -60,9 +60,6 @@ app = Flask(__name__)
 grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
 CORS(grafana)
 
-app.register_blueprint(grafana)
-app.register_blueprint(mobile)
-
 app.config['JSON_SORT_KEYS'] = False
 app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = False
@@ -92,6 +89,9 @@ app.config['SWAGGER'] = {
     'description': f"DETImotica REST backend API version {VERSION}",
     'uiversion': 3
 }
+
+app.register_blueprint(grafana)
+app.register_blueprint(mobile)
 
 csrf = CSRFProtect(app)
 csrf.exempt(grafana)
