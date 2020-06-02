@@ -1181,7 +1181,7 @@ def graf_query():
     if not request.json:
         return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
     req = request.json
-    reqLogin = requests.get(request.host_url+'dashboards/api/user')
+    reqLogin = requests.get(request.host_url+'dashboards/api/user', verify=False)
     if reqLogin.status_code == 200:
         reqLogin = reqLogin.json
     else:
