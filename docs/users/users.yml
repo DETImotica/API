@@ -1,0 +1,23 @@
+Get all users from the database
+---
+tags:
+- Users
+produces:
+- application/json
+responses:
+  '200':
+    description: Returns an array of user's ID
+    schema:
+      properties:
+        ids:
+          type: array
+          items:
+            $ref: "#/definitions/uuid"
+  '401':
+    description: Returns an error as the only admins can get all the users ids
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint

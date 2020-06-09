@@ -1,0 +1,11 @@
+Get event information produced by a given sensor
+---
+tags:
+- Sensors
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+responses:
+  '501':
+    description: Not implemented

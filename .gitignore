@@ -3,3 +3,5 @@ options.conf
 .appconfig
 __pycache__/
 .vscode/
+venv/
+.idea/

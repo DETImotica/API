@@ -1,0 +1,35 @@
+Delete User with the id userid of the database
+---
+tags:
+- Users
+produces:
+- application/json
+parameters:
+  - name: userid
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+responses:
+  '200':
+    description: Returns the remove user's ID
+    schema:
+      properties:
+        id:
+          $ref: "#/definitions/uuid"
+  '401':
+    description: Returns an error as only admins can remove users
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404':
+    description: Returns an error, as the user id does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The userid does not exist

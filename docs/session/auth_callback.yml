@@ -1,0 +1,21 @@
+OAuth callback endpoint (after end-user authorization phase)
+---
+tags:
+- Session
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- text/html
+responses:
+  '400':
+    description: Invalid Request
+    examples:
+      text/html: OAuth error <br>Server returned <b>Invalid request</b>
+  '401':
+    description: Means that you do not have authorization
+    examples:
+      text/html: OAuth authorization aborted <br>Server returned <b>No consent from end-user </b>
+  '500':
+    description: OAuth Error
+    examples:
+      text/html: OAuth Error Please contact an administrator<br>

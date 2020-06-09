@@ -1,0 +1,85 @@
+Create a new room
+---
+tags:
+- Rooms
+definitions:
+  room:
+    properties:
+      name:
+        type: string
+        description: Room's name
+        example: '4.1.01'
+      description:
+        type: string
+        description: Room's description
+        example: 'Laboratório de Eletrónica'
+      sensors:
+        type: array
+        description: List of the sensor_id's of all the sensors in the room
+        items:
+          $ref: "#/definitions/uuid"
+
+consumes:
+- application/json
+produces:
+- application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    description: Information on the new room
+    schema:
+      $ref: '#/definitions/room'
+responses:
+  '200':
+    description: Returns the new room's ID
+    schema:
+      id: new_room_id
+      properties:
+        id:
+          $ref: "#/definitions/uuid"
+  '400':
+    enum: ["Room details incomplete", "One of the detail fields has more than 50 characters, Empty JSON or Empty Body, Room name already exists"]
+    description: >
+      Returns an error description in this list:
+        * Room details incomplete
+        * One of the detail fields has more than 50 characters
+        * Empty JSON or Empty Body
+        * Room name already exists
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Room details incomplete
+  '401':
+    description: Returns an error, as the room is not available for the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404':
+    description: Returns an error description, and the sensors id that are not available to insert
+    schema:
+      non_existent: sensors ids that do not exist
+      non_free: sensors ids that are already associated to a room
+      error_description: error_details_message
+      properties:
+        non_existent:
+          type: array
+          description: List of sensors
+          items:
+            $ref: "#/definitions/uuid"
+        non_free:
+          type: array
+          description: List of sensors
+          items:
+            type: uuid
+            example: '42fef63c-0642-42a0-93de-9e71bcc2649f'
+        error_description:
+          type: string
+          example: Some of the sensors does not exist or are not free
+        
+     

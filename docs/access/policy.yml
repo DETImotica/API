@@ -1,0 +1,44 @@
+Create a new Access Control Policy
+---
+tags:
+- Policies
+produces:
+- application/json
+parameters:
+  - in: body
+    name: body
+    required: true
+    description: "Information on the new room\n
+    In the example the only field that cannot be omitted is the 'subjects' where is sent who is trying to access the resource\n
+    - 'actions' when omitted means that the policy will be applied on all the actions on the resource\n
+    - 'resources' when omitted means that the policy will be applied on all the resources on the API\n
+    - 'context' when omitted means that the policy will have no context\n
+    - 'effect' when omitted will stay with the default value 'allow'\n
+    - 'description' when omitted mean that the policy will have no description"
+    schema:
+      $ref: '#/definitions/policy_rule'
+responses:
+  '200':
+    description: Policy was created succesfully
+    schema:
+      response: Policy Created
+      properties:
+        response:
+          type: string
+          example: "OK"
+  '400':
+    description: Bad Request
+    schema:
+      error_description: Policy not Created, no valid subject
+      properties:
+        error_description:
+          type: string
+          example: "Error"
+  '401':
+    description: Returns an error, as this endpoint is only available for admins
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint

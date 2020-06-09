@@ -1,0 +1,36 @@
+Delete a given sensor from the system
+---
+tags:
+- Sensors
+parameters:
+  - name: sensorid
+    in: path
+    type: string
+    description: uuid of the desired sensor
+    required: true
+produces:
+- application/json
+responses:
+  '200':
+    description: Returns the deleted Sensors ID
+    schema:
+      id: new_sensor_id
+      properties:
+        id:
+          $ref: "#/definitions/uuid"
+  '401':
+    description: Returns an error, as only admin can delete existing sensors
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404':
+    description: Returns an error, as the sensor id sent does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The sensorid does not exist

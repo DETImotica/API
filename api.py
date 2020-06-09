@@ -6,46 +6,101 @@ DETImotica API: Flask REST API module
 authors: Goncalo Perna, Eurico Dias
 """
 
+import base64
 import configparser
 import random
 import sys
 import time
 import json
 import uuid
+import xmltodict
+import re
 
+from collections import OrderedDict
 from functools import wraps
 from urllib.parse import parse_qs
 import requests
+import datetime
 
-from flask import Flask, abort, flash, g, jsonify, redirect, Response, request, session
+from flask import Blueprint ,Flask, abort, flash, jsonify, make_response, redirect, Response, request, session, url_for
 from flask_paranoid import Paranoid
-from flask_swagger import swagger
+from flasgger import Swagger, swag_from
+from flask.sessions import SecureCookieSessionInterface
 from flask_wtf.csrf import CSRFProtect
+from flask_cors import CORS, cross_origin
+from hashlib import sha1, sha3_256, md5
+from calendar import timegm
 from requests_oauthlib import OAuth1
+from Crypto.Protocol.KDF import PBKDF2
 
+from datetime import datetime, timedelta
+
+from access import PDP, PolicyManager
 from datadb import DataDB
 from pgdb import PGDB
 
 from api_grafana import grafana
 
+from caching import cache, session_cache
+
+class ArgumentException(ValueError):
+    pass
+
 # API global vars
 APP_BASE_ENDPOINT = 'api'
 VERSION = 'v1'
 TITLE = 'DETImotica API'
+_SUPPORTED_SCOPES = ['uu', 'name',
+                     'student_info', 'student_schedule', 'student_courses',
+                     'teacher_schedule', 'teacher_courses']
 
 # Flask global vars
 app = Flask(__name__)
-app.register_blueprint(grafana)
-app.config['JSON_SORT_KEYS'] = False
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
 
+#grafana = Blueprint('grafana', __name__,url_prefix='/grafana')
+#CORS(grafana)
+
+app.config['JSON_SORT_KEYS'] = False
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = False
+app.config['CACHE_TYPE'] = "filesystem"
+app.config['CACHE_DIR'] = ".app_attr_cache/"
+app.config['CACHE_DEFAULT_TIMEOUT'] = 3600*24
+app.config['CACHE_OPTIONS'] = {'mode': 600}
+app.config['SWAGGER'] = {
+    'ui_params': {
+        'supportedSubmitMethods': ['get']
+    },
+    "specs": [
+        {
+            "endpoint": "spec",
+            "route": "/docs/spec",
+            "rule_filter": lambda rule: True,  # all in
+            "model_filter": lambda tag: True,  # all in
+        }
+    ],
+    "static_url_path": "/docs/static",
+    "swagger_ui": True,
+    "termsOfService": '',
+    "basePath": f"/{APP_BASE_ENDPOINT}/{VERSION}/",
+    "specs_route": "/docs/",
+    'title': TITLE,
+    'version': VERSION,
+    'description': f"DETImotica REST backend API version {VERSION}",
+    'uiversion': 3
+}
+
+app.register_blueprint(grafana)
+#app.register_blueprint(mobile)
 
 csrf = CSRFProtect(app)
 csrf.exempt(grafana)
+#csrf.exempt(mobile)
 
-paranoid = Paranoid(app)
-paranoid.redirect_view = "/"
+swagger = Swagger(app)
+
+_pdp = PDP()
+_access_mgr = PolicyManager()
 
 # OAuth global vars
 OAUTH_SIGNATURE = 'HMAC-SHA1'
@@ -54,6 +109,18 @@ config = configparser.ConfigParser()
 config.read(".appconfig")
 ck = config['info']['consumer_key']
 cs = config['info']['consumer_secret']
+dk = config['info']['debug_key']
+_ak = config['info']['app_key']
+_mkid = config['info']['manager_id']
+_gkid = config['info']['grafana_id']
+
+_aes_gw_salt = config['info']['gw_secret_salt']
+_aes_gw_key = config['info']['gw_secret_key']
+_gw_kdf_iter = int(config['info']['gw_kdf_iterations'])
+
+_hono_user_name = config['info']['hono_tenant_user']
+_hono_user_pw = config['info']['hono_tenant_pw']
+_hono_register_pw = config['info']['hono_register_pw']
 
 pgdb = PGDB()
 influxdb = DataDB()
@@ -61,50 +128,213 @@ influxdb = DataDB()
 # Default responses
 RESP_501 = "{'resp': 'NOT IMPLEMENTED'}"
 
-# Make sure user is logged in to access user data
-def auth_only(f):
+# attribute dataset methods
+def _simplify_attr_dict(xmldict):
+    res = {}
+
+    for key in xmldict:
+        if key[0] != '@':
+            if isinstance(xmldict[key], OrderedDict):
+                res.update(_simplify_attr_dict(xmldict[key]))
+            elif isinstance(xmldict[key], list):
+                res[key] = [_simplify_attr_dict(item) if isinstance(item, OrderedDict) else item for item in xmldict[key]]
+            else:
+                res[key] = xmldict[key]
+    return res
+
+# def paranoid_error_session():
+#     return Response("ERROR: Invalid session (host does not match original request)", status=403)
+
+@cache.memoize(hash_method=sha3_256)
+def _get_attr(scope, at, ats):
+    if not scope or scope not in _SUPPORTED_SCOPES:
+        raise ArgumentException("Invalid scope")
+    if not at:
+        raise ArgumentException("No value for AT")
+    if not ats:
+        raise ArgumentException("No value for AT secret")
+
+    oauth_data = OAuth1(ck,
+                        client_secret=cs,
+                        resource_owner_key=at,
+                        resource_owner_secret=ats,
+                        signature_method=OAUTH_SIGNATURE,
+                        nonce=str(random.getrandbits(64)),
+                        timestamp=str(int(time.time()))
+                        )
+
+    resp = requests.get("https://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : scope})
+
+    if resp.status_code != 200:
+        return None
+
+    res = _simplify_attr_dict(xmltodict.parse(resp.content.decode()))
+    #print(res)
+    return res
+
+# validate the token
+def _validate_token(uuid, email):
+    at = session_cache.get(uuid)
+    if not at:
+        return False
+
+    ats = session_cache.get(at)
+    if not ats:
+        return False
+
+    uu = _get_attr('uu', at, ats)
+
+    return uu is not None and uuid == uu['iupi'] and email == uu['email']
+
+# return a dict with all relevant user attributes (on this iteration)- Given user id.
+def _get_user_attrc(userUUID):
+    at = session_cache.get(userUUID)
+    ats = session_cache.get(at)
+ 
+    #print(_get_attr('teacher_courses', at, ats))
+ 
+    res = {**_get_attr('uu', at, ats), **_get_attr('name', at, ats)}
+ 
+    st_info = _get_attr('student_info', at, ats)
+    if st_info:
+        st_info.pop('Foto', None)
+ 
+    res.update(st_info)
+ 
+    st_courses = _get_attr('student_courses', at, ats)
+    res.update(student=bool(st_courses))
+    if st_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasAluno']])
+ 
+    prof_courses = _get_attr('teacher_courses', at, ats)
+    res.update(teacher=bool(prof_courses))
+    if prof_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasDocente']])
+ 
+    return res
+
+# return a dict with all relevant user attributes (on this iteration).
+def _get_user_attrs(s):
+    at = session_cache.get(s.get('uuid'))
+    ats = session_cache.get(at)
+
+    #print(_get_attr('teacher_courses', at, ats))
+
+    res = {**_get_attr('uu', at, ats), **_get_attr('name', at, ats)}
+
+    st_info = _get_attr('student_info', at, ats)
+    if st_info:
+        st_info.pop('Foto', None)
+
+    res.update(st_info)
+
+    st_courses = _get_attr('student_courses', at, ats)
+    res.update(student=bool(st_courses))
+    if st_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasAluno']])
+
+    prof_courses = _get_attr('teacher_courses', at, ats)
+    res.update(teacher=bool(prof_courses))
+    if prof_courses:
+        res.update(student_courses=[s['CodDisciplina'] for s in st_courses['ObterListaDisciplinasDocente']])
+
+    return res
+
+def _decode_flask_cookie(cookie_str):
+    from itsdangerous import URLSafeTimedSerializer
+    from flask.sessions import TaggedJSONSerializer
+    
+    salt = 'cookie-session'
+
+    serializer = TaggedJSONSerializer()
+    signer_kwargs = {
+        'key_derivation': 'hmac',
+        'digest_method': sha1
+    }
+    s = URLSafeTimedSerializer(_ak, salt=salt, serializer=serializer, signer_kwargs=signer_kwargs)
+    return s.loads(cookie_str)
+
+# Admin only endpoint decorator
+def admin_only(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not session.get('user') or not session.get('id') or not session.get('token'):
-            abort(401)
+        id = session.get('uuid')
+        if not id:
+            return Response(json.dumps({"error_description": f"You are not logged in."}), status=401, mimetype='application/json')
+        if not pgdb.isAdmin(id):
+            return Response(json.dumps({"error_description": f"Access denied: admin only endpoint."}), status=401, mimetype='application/json')
         return f(*args, **kwargs)
     return wrapper
 
 @app.before_request
 def before_req_f():
-    if request.endpoint == "login":
-        if session.get('user'):
-            flash(f"You are already logged in as {session.get('user')}.")
-            return redirect(request.referrer)
+    print(request.path)
+    if "login" in request.path:
+        print((session.get('user'), session.get('uuid')))
+        if session.get('user') and session.get('uuid') and _validate_token(session.get('uuid'), session.get('user')):
+            appid = request.args.get('app')
+            redir = request.args.get('redirect_url')
+            if not appid:
+                return Response("OK", 200)
+            elif appid == _gkid:
+                r = make_response(redirect(request.host_url + "dashboards", 302))
+                r.headers['User'] = session.get('user')
+                return r
+            else:
+                session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+                session_cookie = session_serializer.dumps(dict(session))
+                return redirect(redir + "?s=" + session_cookie, 301)
+            return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
+#        elif request.cookies.get("fls"):
+#            fls = _decode_flask_cookie(request.cookies.get("fls"))
+#            if fls:
+#                if fls.get('user') and fls.get('uuid'):
+#                    if _validate_token(fls.get('uuid'), fls.get('user')):
+#                        r = make_response(redirect(request.host_url+"dashboards", 301))
+#                        r.headers['User'] = fls.get('user')
+    elif request.path == "/wsauthverify":
+        pass
+    elif request.path != "/spec" and "/docs" not in request.path and "grafana" not in request.path and "mobile" not in request.path and "auth_callback" not in request.path:
+        print((session.get('user'), session.get('uuid')))
+        if not session.get('user') or not session.get('uuid') or not _validate_token(session.get('uuid'), session.get('user')):
+            return Response(json.dumps({"error_description": "You are not logged in."}), status=401, mimetype="application/json")
+
+@app.after_request
+def after_req(response):
+    h = response.headers
+    h['Access-Control-Allow-Origin'] = '*'
+    h['Access-Control-Allow-Methods'] = '*'
+    h['Access-Control-Allow-Headers'] = '*'
+
+    #print(response.get_data())
+    return response
 
 @app.route("/", methods=['GET', 'HEAD'])
-#@auth_only
 def index():
     '''API Root endpoint'''
 
     return f"DETImotica API {VERSION}", 200
 
-@app.route("/spec")
-def spec():
-    '''Swagger UI wrapper endpoint'''
-    swag_obj = swagger(app)
-    swag_obj['info']['title'] = TITLE
-    swag_obj['info']['description'] = f"DETImotica REST backend API version {VERSION}."
-    swag_obj['info']['version'] = VERSION
-    return jsonify(swag_obj)
-
 ####################################################
-#---------Indentity UA OAuth 1.0a endpoints--------#
+#---------Identity UA OAuth 1.0a endpoints---------#
 ####################################################
-
-@app.route("/login")
+@app.route("/login", methods=['GET'])
+@swag_from('docs/session/login.yml')
 def login():
     """
     OAuth Authentication/Authorization endpoint.
     It consists of setting up an OAuth1.0a session up to the 'authorize' phase, redirecting to the identity's auth_url.
     Final steps of OAuth1.0a are done on the auth_callback endpoint (and emulate authentication).
     """
-
+    dom = request.args.get('app')
+    print(dom)
+    redir = request.args.get('redirect_url')
+    
+    if dom:
+        session['app'] = dom
+        if redir:
+            session['redirect_url'] = redir
+    
     oauth_p1 = OAuth1(ck,
                       client_secret=cs,
                       signature_method=OAUTH_SIGNATURE,
@@ -113,28 +343,37 @@ def login():
                      )
 
     resp = requests.post("https://identity.ua.pt/oauth/request_token", auth=oauth_p1)
-    
+
     if resp.status_code != 200:
-        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>", 
+        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",
                         status=resp.status_code
                         )
 
     resp_json = parse_qs(resp.content.decode("utf-8"))
-
+    if not 'oauth_token' in resp_json or not 'oauth_token_secret' in resp_json:
+        return Response(f"Error on OAuth Session.<br>Server returned: <b>{resp.content.decode()}</b>",status=500)
+        
     session['_rt'] = (resp_json['oauth_token'][0], resp_json['oauth_token_secret'][0])
 
     return redirect(f"https://identity.ua.pt/oauth/authorize?oauth_token={session['_rt'][0]}&oauth_token_secret={session['_rt'][0]}", 302)
 
-@app.route("/auth_callback")
+
+@app.route("/auth_callback", methods=['GET'])
+@swag_from('docs/session/auth_callback.yml')
 def auth_callback():
-    '''OAuth callback endpoint (after end-user authorization phase)'''
+    '''
+    OAuth callback endpoint (after end-user authorization phase)
+    '''
 
     ov = request.args.get('oauth_verifier')
     ot = request.args.get('oauth_token')
 
+    if not ov or not ot:
+        return Response("OAuth error.<br>Server returned: <b>Invalid request.</b>", status=400)
+
     if request.args.get('consent'):
         return Response("OAuth authorization aborted.<br>Server returned: <b>No consent from end-user.</b>", status=401)
-    
+
     rt = session.pop('_rt')
     oauth_access =  OAuth1(ck,
                            client_secret=cs,
@@ -151,7 +390,7 @@ def auth_callback():
 
     if not resp_json:
         return Response(f"Error.\nServer returned: <b>{resp.content.decode()}</b>", status=resp.status_code)
-    
+
     try:
         at = resp_json['oauth_token'][0]
         ats = resp_json['oauth_token_secret'][0]
@@ -159,120 +398,281 @@ def auth_callback():
         return Response("""OAuth Error. Please contact an administrator.<br>
                         Server returned: <b>OAuth Server error</b>""", status=500)
 
-    oauth_data = OAuth1(ck,
-                        client_secret=cs,
-                        resource_owner_key=at,  
-                        resource_owner_secret=ats,
-                        signature_method=OAUTH_SIGNATURE,
-                        nonce=str(random.getrandbits(64)),
-                        timestamp=str(int(time.time())),
-                        )
+    # cache attributes
+    uu = _get_attr('uu', at, ats)
+    name = _get_attr('name', at, ats)
+    _get_attr('student_info', at, ats)
+    _get_attr('student_courses', at, ats)
+    _get_attr('student_schedule', at, ats)
+    _get_attr('teacher_schedule', at, ats)
+    _get_attr('teacher_courses', at, ats)
 
-    resp = requests.get("https://identity.ua.pt/oauth/get_data", auth=oauth_data, params={'scope' : 'uu'})
+    session['uuid'] = uu['iupi']
+    session['user'] = uu['email']
+    session['fname'] = name['name']
+    session['lname'] = name['surname']
 
-    attrs = resp.content.decode('utf-8').split("@ua.pt")
-    uemail = attrs[0]
-    uuid = attrs[1]
-
-    session['id'] = uuid
-    session['user'] = uemail
-    session['token'] = at
-    session['secret'] = ats
-
-    # add user if it doesn't exist. If it does, 
-    if (influxdb.has_user(uuid)):
-        pass
-    else:
-        influxdb.add_user(uuid, uemail)
+    session_cache.set(uu['iupi'], at)
+    session_cache.set(at, ats)
     
-    return Response("LOGIN OK", status=200)
+    session['ts'] = int(time.time())
 
-@app.route("/logout")
+    # add user if it doesn't exist.
+    if (not pgdb.hasUser(uu['iupi'])):
+        pgdb.insertUser(uu['iupi'], uu['email'], False)
+    
+    if 'app' in session and session['app'] == _gkid:
+        #expiry_epoch = int(datetime.utcnow().timestamp()) + _graf_lnk_expiry_s
+        #h_str = str(expiry_epoch) + session['user'] + _gkid
+        #h = md5(h_str.encode()).digest()
+        #h = (base64.b64encode(h)).decode()
+        #for o, r in [("=", ""),  ("+", "-"), ("/", "_")]:
+        #    h = h.replace(o, r)
+        #new_url = request.host_url + "?user=" + session['user'] + "&app=" + _gkid + "&md5=" + h + "&expires=" + str(expiry_epoch)
+        #print(new_url)
+        #session_cache.set(_gkid + ";=;" + session['user'], new_url)
+        #return Response(f'<a href="{new_url}">Go to Grafana</a>', 200)
+        #session.pop('app')
+        session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+        session_cookie = session_serializer.dumps(dict(session))
+        r = make_response(redirect(request.host_url + "dashboards/", 302))
+        #r.headers['fls'] = session_cookie
+        r.set_cookie("fls", session_cookie)
+        #return Response(f'<a href="{request.host_url + "grafana/"}">Go to Grafana</a>', headers={"fls", session_cookie}, status=302, url=request.host_url+"grafana/")
+        return r
+    if 'app' in session and 'redirect_url' in session:
+        loc = session.get('redirect_url')
+        if session['app'] == 'gestao' and not pgdb.isAdmin(session['uuid']):
+            loc += 'forbidden'
+        if loc:
+            session_serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+            session_cookie = session_serializer.dumps(dict(session))
+            return redirect(loc + "?s=" + session_cookie, 301)
+    return Response(json.dumps({**uu, **name}), status=200, content_type='application/json')
+
+@app.route("/logout", methods=['GET'])
+@swag_from('docs/session/logout.yml')
 def logout():
-    '''Logout endpoint'''
+    '''
+    Logout endpoint
+    '''
+    if not session.get('user') or not session.get('uuid'):
+        Response("Logout bad request. Server returned: <b>You are not logged in.<b>",status=400)
+    
+    print(session.get('user'))
+    print(session.get('uuid'))
+    
+    uuid = session.get('uuid')
 
+    at = session_cache.get(uuid)
+    if not at:
+        return Response(json.dumps({"error_description": "Session expired. Please login."}), status=401, mimetype="application/json")
+    
+    ats = session_cache.get(at)
+
+    #clear cache
+    for s in _SUPPORTED_SCOPES:
+        cache.delete_memoized(_get_attr, s, at, ats)
+    session_cache.delete(at)
+    session_cache.delete(uuid)
+    #session_cache.delete(_gkid + ";=;" + user)
+
+    #clear session
     session.clear()
-    return Response("Logout successful.",status=200)
 
+    
+    r = Response("Logout successful.", status=200)
+    r.set_cookie('fls', "", expires=0)
+    return r
+
+@app.route("/wsauthverify")
+def auth_verify():
+    # if session is passed through a header, that is the session
+    fls = request.cookies.get("fls")
+    print(fls)
+
+    if not fls:
+        fls = session
+    else:
+        fls = _decode_flask_cookie(fls)
+    
+    if fls.get('user') and fls.get('uuid'):
+        if _validate_token(fls.get('uuid'), fls.get('user')):
+            r = Response("OK", 200)
+            if pgdb.isAdmin(fls.get('uuid')):
+                r.headers['User'] = 'admin'
+            else:
+                return ("NOK", 403)
+            # else:
+            #     r.headers['User'] = fls.get('user')
+            return r
+    return ("NOK", 403)
 
 ##################################################
 #---------Room data exposure endpoints-----------#
 ##################################################
 
 @app.route("/rooms", methods=['GET'])
+@swag_from('docs/rooms/rooms.yml')
 def rooms():
+    '''
+    Get all rooms id that exist on our API
+    '''
     dic = {}
-    dic.update(ids = pgdb.getRooms())
+    
+    user_attrs = _get_user_attrs(session)
+                 
+    rooms = []
+    for r in pgdb.getRooms():
+        #Verificar quais salas podem ser acedidas pelo utilizador
+        if ( _pdp.get_http_req_access(request, user_attrs, opt_resource={'room': r}) or at_least_one_sensor(r) ):
+            rooms.append(r)
+    
+    dic.update(ids = rooms)
+
     return Response(json.dumps(dic), status=200, mimetype='application/json')
 
+def at_least_one_sensor(room):
+    user_attrs = _get_user_attrs(session)
+    for s in pgdb.getSensorsFromRoom(room):
+        if _pdp.get_http_req_access(request, user_attrs, {'sensor' : s}):
+            return True
+    return False
 
 @app.route("/room", methods=['POST'])
-
-#Error cases
-# 1 - at least one of the sensors is already linked to a room
-# 2 - at least one of the sensors doesnt exist
-
-#In a valid case we send the id of the new room
-
+@admin_only
+@swag_from('docs/rooms/room.yml')
+@csrf.exempt
 def newroom():
+    '''
+    Create a new room
+    '''
+
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
     id = uuid.uuid4()
     details = request.json  # {name: "", description: "", sensors: ["","",...] }
 
+    #Validar as meta-informações acerca das salas
+    if "name" not in details:
+        return Response(json.dumps({"error_description" : "Room details incomplete"}), status=400, mimetype='application/json')
+
+    if pgdb.roomNameExists(details["name"]):
+        return Response(json.dumps({"error_description": "Room name already exists"}), status=400, mimetype='application/json')
+
+    if len(details["name"])>50 or ("description" in details and len(details["description"])>50) :
+        return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+    if "sensors" not in details:
+        details["sensors"] = []
+
+    #Dois arrays para guardar os sensores que não existem e o aqueles que já estão atribuidos a uma sala
     error = {"non_existent": [], "non_free": [], "error_description": "Some of the sensors does not exist or are not free"}
-    for s in details["sensors"]:
-        try:
-            if (not pgdb.isSensorFree(s)):
-                error["non_free"].append(s)
-        except:
-            error["non_existent"].append(s)
+
+    if sensors in details:
+        for s in details["sensors"]:
+            try:
+                if (not pgdb.isSensorFree(s)):
+                    error["non_free"].append(s)
+            except:
+                error["non_existent"].append(s)
 
     if(error["non_existent"] != [] or error["non_free"] != []):
         return Response(json.dumps(error), status=400, mimetype='application/json')
 
     pgdb.createRoom(id, {"name":details["name"], "description":details["description"]}, details["sensors"])
-    return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
+    return Response(json.dumps({"id": str(id)}), status=200, mimetype='application/json')
 
 
-@app.route("/room/<roomid>", methods=['GET', 'POST', 'DELETE'])
+@app.route("/room/<roomid>", methods=['GET'])
+@swag_from('docs/rooms/room_roomid_get.yml', methods=['GET'])
 def room_id(roomid):
-    if request.method == 'GET':
-        if pgdb.roomExists(roomid):
-            #TODO podemos depois aquilo restringir com as politicas as info das salas
-            return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+    '''
+    [GET] Get meta-info from a room <roomid>
+    '''
+    if not pgdb.roomExists(roomid):
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
+    if request.method == 'GET': 
+        user_attrs = _get_user_attrs(session)
+        if not _pdp.get_http_req_access(request, user_attrs) and not at_least_one_sensor(roomid):
+            return Response(json.dumps({"error_description": f"Access denied to room {roomid}. Talk to an administrator"}), status=401, mimetype='application/json')
 
+        return Response(json.dumps(pgdb.getRoom(roomid)), status=200, mimetype='application/json')
 
+    return jsonify(RESP_501), 501
+
+@app.route("/room/<roomid>", methods=['POST', 'DELETE'])
+@admin_only
+@swag_from('docs/rooms/room_roomid_post.yml', methods=['POST'])
+@swag_from('docs/rooms/room_roomid_delete.yml', methods=['DELETE'])
+@csrf.exempt
+def room_id_admin(roomid):
+    '''
+    [POST] Change meta-info from a room <roomid>
+    [DELETE] Delete a room <roomid> from the system
+    '''
+
+    if not pgdb.roomExists(roomid):
+        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
     if request.method == 'POST':
-        new_details = request.json #{name: "", description: ""}
-        if (len(new_details["name"])>50 or len(new_details["description"]>50)):
-            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=200, mimetype='application/json')
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
 
-        if pgdb.roomExists(roomid):
-            # TODO podemos depois aquilo restringir com as politicas as info das salas
-            pgdb.updateRoom(roomid, new_details)
-            return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description": "The roomid does not exist"}), status=200, mimetype='application/json')
+        new_details = request.json #{name: "", description: ""}"
+        if ("name" in new_details and len(new_details["name"])>50):
+            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+        if ("description" in new_details and len(new_details["description"])>50):
+            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
 
-    #TODO remover salas
+        if ("name" in new_details and pgdb.getRoom(roomid)["name"] != new_details["name"] and pgdb.roomNameExists(new_details["name"])):
+            return Response(json.dumps({"error_description": "The new name already exists"}), status=400, mimetype='application/json')
+
+        pgdb.updateRoom(roomid, new_details)
+        return Response(json.dumps({"id":roomid}), status=200, mimetype='application/json')
+
+    if request.method == 'DELETE':
+        pgdb.deleteRoom(roomid)
+        return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
+
     return jsonify(RESP_501), 501
 
 
-@app.route("/room/<roomid>/sensors", methods=['GET', 'POST'])
+@app.route("/room/<roomid>/sensors", methods=['GET'])
+@swag_from('docs/rooms/room_sensors_get.yml', methods=['GET'])
 def sensors_room_id(roomid):
-    if request.method == 'GET':
+    '''
+    [GET] Get all sensors id from a room <room-id>
+    '''
+    user_attrs = _get_user_attrs(session)
+    if not _pdp.get_http_req_access(request, user_attrs) and not at_least_one_sensor(roomid):
+        return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
+    
+    if request.method == 'GET': 
         if pgdb.roomExists(roomid):
-            # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
             dic = {}
-            dic.update(ids = pgdb.getSensorsFromRoom(roomid))
-            # TODO verificar quais sensores o user tem acesso
+            sensors = [s for s in pgdb.getSensorsFromRoom(roomid) if _pdp.get_http_req_access(request, user_attrs, opt_resource={'sensor': s})]
+            dic.update(ids = sensors)
             return Response(json.dumps(dic), status=200, mimetype='application/json')
-        return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=400, mimetype='application/json')
+        return Response(json.dumps({"error_description" : "The roomid does not exist"}), status=404, mimetype='application/json')
+    
+@app.route("/room/<roomid>/sensors", methods=['POST'])
+@admin_only
+@swag_from('docs/rooms/room_sensors_post.yml', methods=['POST'])
+@csrf.exempt
+def sensors_room_id_admin(roomid):
+    '''
+    [POST] Change the sensors that exist in a room <room-id>
+    '''
 
     if request.method == 'POST':
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
         if pgdb.roomExists(roomid):
-            # TODO podemos depois aquilo restringir com as politicas as info das salas (verificar se tem acesso a sala)
+
             details = request.json  # {"sensors": {"add" : [], "remove" : []}}
             error = {"add_sensors" : {"non_free": [], "non_existent": []}, "rm_sensors": {"diferent_room" : [], "non_existent" : []}, "error_description" : "One of the sensors sent is invalid"}
 
@@ -296,132 +696,541 @@ def sensors_room_id(roomid):
             pgdb.updateSensorsFromRoom(roomid, details)
             return Response(json.dumps({"id": roomid}), status=200, mimetype='application/json')
 
+@app.route("/room/<roomid>/sensors/full", methods=['GET'])
+@swag_from('docs/rooms/room_sensors_full_get.yml', methods=['GET'])
+def sensors_room_id_fullversion(roomid):
+    '''
+    [GET] Get full meta_info from all the sensors in a room <roomid>
+    '''
+
+    if pgdb.roomExists(roomid):
+        user_attrs = _get_user_attrs(session)
+        if not _pdp.get_http_req_access(request, user_attrs) and not at_least_one_sensor(roomid):
+            return Response(json.dumps({"error description": f"Access denied to room {roomid}. Talk to an administrator."}), status=401, mimetype='application/json')
+
+        ##{"id": "", "description": "", "data" : { "type" : "", "unit_symbol" : ""}}
+        sensors = [s for s in pgdb.getSensorsFullDescriptionFromRoom(roomid) if _pdp.get_http_req_access(request, user_attrs, opt_resource={'sensor': s["id"]})]
+        return Response(json.dumps(sensors), status=200, mimetype='application/json')
+    return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+
+
 ##################################################
 #---------User data exposure endpoints-----------#
 ##################################################
 
 @app.route("/users", methods=['GET'])
+@admin_only
+@swag_from('docs/users/users.yml', methods=['GET'])
 def users():
-    '''Get all users (pelo menos uma chave) from the database --> getUsers(bd).'''
-    return jsonify(RESP_501), 501
+    '''
+    Get all users uuid from the database 
+    '''
+    return Response(json.dumps({"ids": pgdb.getUsers()}), status=200,mimetype='application/json')
 
-@app.route("/user/<internalid>", methods=['POST'])
-def user_policy(internalid):
-    '''change access policy on the database from the JSON received.'''
-    return jsonify(RESP_501), 501
 
+@app.route("/users/full", methods=['GET'])
+@admin_only
+@swag_from('docs/users/users_full.yml', methods=['GET'])
+def users_full():
+    '''
+    Get all users uuid from the database 
+    '''
+    return Response(json.dumps(pgdb.getUsersFull()), status=200,mimetype='application/json')
+
+@app.route("/user", methods=['POST'])
+@admin_only
+@swag_from('docs/users/user.yml', methods=['POST'])
+@csrf.exempt
+def user_id():
+    '''
+    [POST] Insert a new user on the system
+    '''
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+    user_details = request.json()
+
+    if "email" not in user_details or "admin" not in user_details :
+        return Response(json.dumps({"error_description": "User Details incomplete"}), status=400, mimetype='application/json')
+
+    # if pgdb.emailExists(user_details["email"]):
+    #     return Response(json.dumps({"error_description": "User Email already exists"}), status=400, mimetype='application/json')
+
+    user_id = uuid.uuid4()
+    pgdb.insertUser(user_id, user_details["email"], user_details["admin"])
+    return Response(json.dumps({"id": str(user_id)}), status=200, mimetype='application/json')
+
+@app.route("/user/<userid>", methods=['GET','POST','DELETE'])
+@admin_only
+@swag_from('docs/users/users_userid_get.yml', methods=['GET'])
+@swag_from('docs/users/users_userid_post.yml', methods=['POST'])
+@swag_from('docs/users/users_userid_delete.yml', methods=['DELETE'])
+@csrf.exempt
+def user_id_admin(userid):
+    '''
+    [GET] Get info from a user <userid>
+    [POST] Change the admin state
+    [DELETE] DELETE user <userid> from the system
+    '''
+
+    if request.method == 'GET':
+        if not pgdb.hasUser(userid):
+            return Response(json.dumps({"error_description": "User does not exist"}), status=404, mimetype='application/json')
+
+        return Response(json.dumps(pgdb.getUser(userid)), status=200, mimetype='application/json')
+
+    if request.method == 'POST':
+        if not pgdb.hasUser(userid):
+            return Response(json.dumps({"error_description": "User does not exist"}), status=404, mimetype='application/json')
+
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+        details = request.json
+        details["admin"] = details["admin"].lower()
+        if details["admin"] != "true" and details["admin"] != "false":
+            return Response(json.dumps({"error_description": "Admin field new value should be 'true' or 'false'"}), status=400, mimetype='application/json')
+
+        pgdb.changeUserAdmin(userid, details["admin"])
+        return Response(json.dumps({"id": userid}), status=200, mimetype='application/json')
+
+
+    if request.method == 'DELETE':
+        if not pgdb.hasUser(userid):
+            return Response(json.dumps({"error_description": "User does not exist"}), status=404, mimetype='application/json')
+
+        pgdb.deleteUser(userid)
+        return Response(json.dumps({"id": userid}), status=200, mimetype='application/json')
+
+
+@app.route("/identity")
+def get_username():
+    '''
+    Get user session information
+    '''
+    at = session_cache.get(session.get('uuid'))
+    ats = session_cache.get(at)
+    return Response(json.dumps({**_get_attr('uu', at, ats),
+            **_get_attr('name', at, ats),
+           }), status=200, mimetype='application/json')
 
 ##################################################
 #---------Sensor data exposure endpoints---------#
 ##################################################
 
 @app.route("/sensors", methods=['GET'])
+@swag_from('docs/sensors/sensors.yml')
 def sensors():
-    '''Get the sensors_id for a user from the database --> getAllowedSensors(bd, user_email).'''
-    return jsonify(RESP_501), 501
+    '''
+    Get the sensors_id for a user from the database
+    '''
 
+    user_attrs = _get_user_attrs(session)
 
-@app.route("/types", methods=['GET'])
-def types():
-    '''Get all types of sensors for a user from the database --> getAllowedTypes(bd, user_email)'''
-    return jsonify(RESP_501), 501
-
+    s_list = pgdb.getAllSensors()
+    d = {"ids" : [tuplo[0] for tuplo in s_list if _pdp.get_http_req_access(request, user_attrs, {'sensor' : tuplo[0]})]} 
+    return Response(json.dumps(d), status=200, mimetype='application/json')
 
 @app.route("/sensor", methods=['POST'])
+@admin_only
+@swag_from('docs/sensors/sensor.yml')
 @csrf.exempt
 def new_sensor():
+    '''
+    Create a new Sensor, and register it on Hono
+    '''
+
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
     id = uuid.uuid4()
     details = request.json #{"description" : "", data : { type : "", unit_symbol : ""}, "room_id" : ""}
-    #TODO Veficar se a pessoa é um admin
 
-    #TODO Verificar se os campos estao todos, e ainda verifcar se cabem na base de dados
+    if "data" not in details:
+        return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
 
-    #url = "http://iot.av.it.pt/device/standalone"
-    #data_influx = {"tenant-id": "detimotic", "device-id" : id, "password": "<password>"}
-    #response = requests.post(url, headers={"Content-Type": "application/json"}, auth=("detimotic", "<pass>"), data=json.dumps(data_influx))
-    #if response.status_code == 409:
-    #    return Response(json.dumps({"error_description": "O Id ja existe"}), status=409, mimetype='application/json')
+    if "description" in details and len(details["description"])>50:
+        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400,mimetype='application/json')
 
-    if not pgdb.datatypeExist(details["data"]["type"]):
-        return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+    if "type" not in details["data"] or "unit_symbol" not in details["data"]:
+        return Response(json.dumps({"error_description": "Sensor Details Incomplete"}), status=400, mimetype='application/json')
+
+    if len(details["data"]["type"])>50:
+        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400,mimetype='application/json')
+
+    if len(details["data"]["unit_symbol"])>3:
+        return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}), status=400,mimetype='application/json')
+
+    if not pgdb.datatypeNameExists(details["data"]["type"]):
+        return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
+    
+    user_attrs = _get_user_attrs(session)
+    if not _pdp.get_http_req_access(request, user_attrs, {'sensor' : id}):
+        return Response(json.dumps({"error description": f"Access denied: you can't add a new sensor."}), status=401, mimetype='application/json')
 
     if "room_id" in details:
         if not pgdb.roomExists(details["room_id"]):
-            return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+            return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
+    
+    if not _pdp.get_http_req_access(request, user_attrs, {'room' : details['room_id']}):
+        return Response(json.dumps({"error description": f"Access denied: you can't add a new sensor to room {details['room_id']}."}), status=401, mimetype='application/json')
+
+    try:
+        url = "http://192.168.85.112/device/standalone"
+        data_influx = {"tenant-id": "detimotic", "device-id" : str(id), "password": _hono_register_pw}
+        response = requests.post(url, headers={"Content-Type": "application/json"}, auth=(_hono_user_name, _hono_user_pw),timeout=5, data=json.dumps(data_influx))
+        if not response or response.status_code != 201:
+            return Response(json.dumps({"error_description": "Connection to hono error"}), status=500, mimetype='application/json')
+    except:
+        return Response(json.dumps({"error_description": "Connection to hono timeout"}), status=408, mimetype='application/json')
 
     pgdb.createSensor(id, details)
-    return Response(json.dumps({"id": id}), status=200, mimetype='application/json')
+    sensor_key = base64.b64encode(PBKDF2(_aes_gw_key + str(id), _aes_gw_salt, 16, int(_gw_kdf_iter), None)).decode('utf-8')
+    return Response(json.dumps({"id": str(id), "key": sensor_key}), status=200, mimetype='application/json')
 
 
-@app.route("/sensor/<sensorid>", methods=['GET', 'POST', 'DELETE'])
+@app.route("/sensor/<sensorid>", methods=['GET'])
+@swag_from('docs/sensors/sensor_sensorid_get.yml', methods=['GET'])
 def sensor_description(sensorid):
-    if request.method == 'GET':
-        # TODO verificar quais sensores o user tem acesso
+    '''
+    Get meta-info from a sensor <sensorid>
+    '''
+    
+    try:
+        pgdb.isSensorFree(sensorid)
+        print("passou verificação")
+        if not _pdp.get_http_req_access(request, _get_user_attrs(session)):
+            return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
+        
         try:
-            pgdb.isSensorFree(sensorid)
             return Response(json.dumps(pgdb.getSensor(sensorid)), status=200, mimetype='application/json')
-        except:
-            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
+        except TypeError:
+            return Response(json.dumps(pgdb.getSensorWithoutRoom(sensorid)), status=200, mimetype='application/json')
+    except:
+        return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+
+@app.route("/sensor/<sensorid>", methods=['POST', 'DELETE'])
+@admin_only
+@swag_from('docs/sensors/sensor_sensorid_post.yml', methods=['POST'])
+@swag_from('docs/sensors/sensor_sensorid_delete.yml', methods=['DELETE'])
+@csrf.exempt
+def sensor_description_admin(sensorid):
+    '''
+    [POST] Change the meta-info from a sensor <sensorid>
+    [DELETE] Delete a sensor <sensorid> from the system
+    '''
 
     if request.method == 'POST':
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
         details = request.json #{"description": "", "data" : { "type" : "", "unit_symbol" : ""}, room_id: ""}
-        # TODO verificar quais sensores o user tem acesso
 
         try:
             pgdb.isSensorFree(sensorid)
         except:
-            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=400, mimetype='application/json')
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
 
+        if len(details["description"]) > 50:
+            return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
 
-        if "data" in details and "type" in details["data"] and not pgdb.datatypeExist(details["data"]["type"]):
-            return Response(json.dumps({"error_description": "The data type does not exist"}), status=400, mimetype='application/json')
+        if "data" in details:
+            if "type" in details["data"]:
+                    if not pgdb.datatypeNameExists(details["data"]["type"]):
+                        return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
+                    if len(details["data"]["type"])>50:
+                        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}),status=400, mimetype='application/json')
+            if "unit_symbol" in details["data"]:
+                    if len(details["data"]["unit_symbol"])>3:
+                        return Response(json.dumps({"error_description": "The Unit Symbol has more than 3 characters"}),status=400, mimetype='application/json')
+
+        if "data" in details and "type" in details["data"] and not pgdb.datatypeNameExists(details["data"]["type"]):
+            return Response(json.dumps({"error_description": "The data type does not exist"}), status=404, mimetype='application/json')
+
 
         if "room_id" in details:
             if not pgdb.roomExists(details["room_id"]):
-                return Response(json.dumps({"error_description": "The roomid does not exist"}), status=400, mimetype='application/json')
+                return Response(json.dumps({"error_description": "The roomid does not exist"}), status=404, mimetype='application/json')
 
         pgdb.updateSensor(sensorid, details)
         return Response(json.dumps({"id":sensorid}), status=200, mimetype='application/json')
 
-    #TODO falta remover sensores
-    return jsonify(RESP_501), 501
+    if request.method == 'DELETE':
+        try:
+            pgdb.isSensorFree(sensorid)
+            pgdb.deleteSensor(sensorid)
+            return Response(json.dumps({"id": sensorid}), status=200, mimetype='application/json')
+        except:
+            return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=404, mimetype='application/json')
 
+@app.route("/sensor/<sensorid>/key", methods=['GET'])
+@admin_only
+@swag_from('docs/sensors/sensor_sensorid_key.yml', methods=['GET'])
+def sensor_key(sensorid):
+    try:
+        pgdb.isSensorFree(sensorid)
+    except:
+        return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+            
+    key = base64.b64encode(PBKDF2(_aes_gw_key + sensorid, _aes_gw_salt, 16, _gw_kdf_iter, None)).decode('utf-8')
+    return Response(json.dumps({"key": key}), status=200, mimetype='application/json')
 
 @app.route("/sensor/<sensorid>/measure/<option>", methods=['GET'])
+@swag_from('docs/sensors/sensor_measure.yml')
 def sensor_measure(sensorid, option):
-    '''Verify if the sensor supports a "measure" from database getTypeFromSensor()'''
+    '''
+    Get the measures from a sensor <sensorid>
+        - <option> instant  - get the last value
+        - <option> interval - get the all the value in an interval
+        - <option> median   - get the median of the values in an interval
+    '''
+    if not _pdp.get_http_req_access(request, _get_user_attrs(session), {'sensor' : sensorid}):
+            return Response(json.dumps({"error description": f"Access denied to sensor {sensorid}. Talk to an administrator."}), status=401, mimetype='application/json')
+
+    try:
+        pgdb.isSensorFree(sensorid)
+    except:
+        return Response(json.dumps({"error_description": "The sensorid does not exist"}), status=404,mimetype='application/json')
+
+    #TODO Verificar se o intervalo é válido para o influx
+
     if option == "instant":
         return Response(influxdb.query_last(sensorid), status=200, mimetype='application/json')
     if option == "interval":
         extremo_min = request.args.get('start')
+        if extremo_min == None:
+            return Response(json.dumps({"error_description": "The start parameter was not specified"}), status=400, mimetype='application/json')
+
         extremo_max = request.args.get('end')
+        if extremo_max == None:
+            extremo_max = datetime.datetime.utcnow().isoformat("T")+"Z"
         return Response(influxdb.query_interval(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
+
+
     if option == "mean":
         extremo_min = request.args.get('start')
+        if extremo_min == None:
+            return Response(json.dumps({"error_description": "The start parameter was not specified"}), status=400,
+                            mimetype='application/json')
+
         extremo_max = request.args.get('end')
+        if extremo_max == None:
+            extremo_max = datetime.datetime.utcnow().isoformat("T") + "Z"
         return Response(influxdb.query_avg(sensorid, extremo_min, extremo_max), status=200, mimetype='application/json')
-    return Response(jsonify(RESP_501), status=501, mimetype='application/json')
+    return Response(json.dumps({"error_description" : "Option does not exist"}), status=404, mimetype='application/json')
 
-@app.route("/sensor/<sensorid>/event/<option>", methods=['GET'])
-def sensor_event(sensorid, option):
-    '''Verify if the sensor supports "Events" from database'''
-    # get data from influx
-    return jsonify(RESP_501), 501
 
 ####################################################
+##              Type Data Methods                 ##
 ####################################################
 
-# run self-signed and self-managed PKI instead of self-signed certificate
-# (or a real cert?) 
+@app.route("/types", methods=['GET'])
+@swag_from('docs/types/types.yml')
+def types():
+    '''
+    Get all types of sensors for a user from the database
+    '''
+
+    user_attrs = _get_user_attrs(session)
+
+    d = {"ids" : [tuplo[0] for tuplo in pgdb.getAllSensorTypes() if _pdp.get_http_req_access(request, user_attrs, {'type' : tuplo[0]}) or at_least_one_sensor_type(tuplo[0])]} 
+    return Response(json.dumps(d), status=200, mimetype='application/json')
+
+def at_least_one_sensor_type(t):
+    user_attrs = _get_user_attrs(session)
+    for s in pgdb.getSensorsFromType(t):
+        if _pdp.get_http_req_access(request, user_attrs, {'sensor' : s}):
+            return True
+    return False
+
+@app.route("/type", methods=['POST'])
+@admin_only
+@swag_from('docs/types/type.yml', methods=['POST'])
+@csrf.exempt
+def new_type():
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+    details = request.json  # {"name" : "" ,"description" : ""}
+
+    if "description" not in details or "name" not in details:
+        return Response(json.dumps({"error_description": "New Data Type Details Incomplete"}), status=400, mimetype='application/json')
+
+    if len(details["description"]) > 50 or len(details["name"]) > 50:
+        return Response(json.dumps({"error_description": "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+    if pgdb.datatypeNameExists(details["name"]) :
+        return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
+
+    id = pgdb.createSensorType(details)
+    return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
+
+@app.route("/type/<id>", methods=['GET'])
+@swag_from('docs/types/type_typename_get.yml', methods=['GET'])
+def typesFromName(id):
+    user_attrs = _get_user_attrs(session)
+    
+    if not pgdb.datatypeIdExists(id):
+        return Response(json.dumps({"error_description": "The type id sent does not exist"}), status=400, mimetype='application/json')
+
+    if not _pdp.get_http_req_access(request, user_attrs):
+        return Response(json.dumps({"error description": f"Access denied to type of sensor {id}. Talk to an administrator."}), status=401, mimetype='application/json')
+
+    return Response(json.dumps(pgdb.getSensorType(id)), status=200, mimetype='application/json')
+
+@app.route("/type/<id>", methods=['POST', 'DELETE'])
+@admin_only
+@csrf.exempt
+@swag_from('docs/types/type_typename_post.yml', methods=['POST'])
+@swag_from('docs/types/type_typename_delete.yml', methods=['DELETE'])
+def typesFromName_admin(id):
+    if request.method == 'POST':
+        if not request.json:
+            return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+
+        details = request.json #{"name" : "", description" : ""}
+
+        if ("name" in details) and len(details["name"]) > 50:
+            return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+        if ("description" in details) and len(details["description"]) > 50:
+            return Response(json.dumps({"error_description" : "One of the detail fields has more than 50 characters"}), status=400, mimetype='application/json')
+
+        if "name" in details and pgdb.getSensorType(id)["name"] != details["name"] and pgdb.datatypeNameExists(details["name"]) :
+            return Response(json.dumps({"error_description": "This data type already exists"}), status=400, mimetype='application/json')
+
+        pgdb.updateSensorType(id, details)
+        return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
+
+    if request.method == 'DELETE':
+        if pgdb.getSensorsFromType(id) != []:
+            return Response(json.dumps({"error_description" : "Cannot remove a sensor type that has at least one sensor"}), status=400, mimetype='application/json')
+
+        pgdb.deleteSensorType(id)
+        return Response(json.dumps({"id" : id}), status=200, mimetype='application/json')
+
+####################################################
+##            Access Control Database             ##
+####################################################
+
+@app.route("/accessPolicy", methods=['POST'])
+@admin_only
+@csrf.exempt
+@swag_from('docs/access/policy.yml', methods=['POST'])
+def newAccessPolicy():
+    response = _access_mgr.create_policy(request)
+    if not response[0]:
+        return Response(json.dumps({"error_description" : response[1]}), status=400, mimetype='application/json')
+    return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
+
+@app.route("/accessPolicy/<policyid>", methods=['POST', 'DELETE'])
+@admin_only
+@csrf.exempt
+@swag_from('docs/access/updatePolicy.yml', methods=['POST'])
+@swag_from('docs/access/deletePolicy.yml', methods=['DELETE'])
+def accessPolicy(policyid):
+    if request.method == 'POST' :
+        _access_mgr.update_policy(request)
+        return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
+        
+    if request.method == 'DELETE' :
+        _access_mgr.delete_policy(policyid)
+        return Response(json.dumps({"response" : "OK"}), status=200, mimetype='application/json')
+
+@app.route("/accessPolicies", methods=['GET'])
+@admin_only
+@swag_from('docs/access/policies.yml', methods=['GET'])
+def getAllAccessPolicies():
+    if not request.json:
+        return Response(json.dumps(_access_mgr.get_policies()), status=200, mimetype='application/json')
+    return Response(json.dumps(_access_mgr.get_policies(request)), status=200, mimetype='application/json')
+
+####################################################
+##            Mobile                              ##
+####################################################
+
+# Push Notifications
+#@admin_only
+#Webhook that handles Grafana Alerts and sends notifications to FirebaseCM
+#ruleName should be sensor id, otherwise the notification will not work
+
+@admin_only
+@csrf.exempt
+@cross_origin()
+@app.route('/mobile/notifications', methods=['POST'])
+def mobile_notifications ():
+    
+    if not request.json:
+        return Response(json.dumps({"error_description": "Empty JSON or empty body."}), status=400,mimetype='application/json')
+        
+    req= request.json
+    print(req)
+    if not ('message' in req.keys() and 'title' in req.keys()):
+        return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')
+    
+    data= {}
+    topicName= ''
+    
+    try:
+        if 'metric' in ((req['evalMatches'][0]).keys()):
+            topicName= (req['evalMatches'][0])['metric']
+        else:
+            return Response(json.dumps({"error_description" : "Invalid request. Can only send a notification to a single sensor topic"}), status=400, mimetype='application/json')        
+    except KeyError:
+        topicName= 'control'
+    except:
+        return Response(json.dumps({"error_description" : "Invalid request"}), status=400, mimetype='application/json')                    
+
+    if topicName!= 'control':
+        try:
+            pgdb.isSensorFree(topicName)
+            sensorInfo= pgdb.getSensor(topicName)
+            data['id']= topicName
+            data['room']= sensorInfo['room_id']
+            data['type']= sensorInfo['data']['type'] 
+        except:
+            return Response(json.dumps({"error_description" : "The sensorid does not exist"}), status=404, mimetype='application/json')
+
+    try: 
+        with open('.secret_config.json') as json_file:
+            secret= json.load(json_file)
+    except:
+        # Webhook handle is ok, notifcation is not sent
+        return Response(json.dumps({"error_description" : "Could not open or locate config file"}), status=500, mimetype='application/json')
+
+    #Message Payload
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'key=' + secret['key'],
+    }
+
+    body = {
+        'notification': {'title': req['title'],
+                         'body': req['message']
+                        },
+        'to': '/topics/' + topicName,
+        'data': data
+    }
+    # Send a notification to the devices subscribed to the provided topic
+    response = requests.post("https://fcm.googleapis.com/fcm/send",headers = headers, data=json.dumps(body))
+    
+    if response.status_code == 200:
+        return Response(json.dumps({}), status=200, mimetype='application/json')   
+    else:
+        return Response(json.dumps({"error_description" : "Could not sent notification"}), status=response.status_code, mimetype='application/json')
+
 if __name__ == "__main__":
     try:
         config.read(".appconfig")
 
         app.config['SECRET_KEY'] = config['info']['app_key']
         app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
-        
+
         csrf.init_app(app)
-        paranoid.init_app(app)
+        #paranoid.init_app(app)
+        cache.init_app(app)
+        session_cache.init_app(app)
+
         app.run(host='0.0.0.0', port=443, ssl_context=('cert.pem', 'key.pem'))
 
     except KeyboardInterrupt:

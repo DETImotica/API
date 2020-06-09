@@ -1,0 +1,58 @@
+Modify a sensor type
+---
+tags:
+- Types
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+parameters:
+  - name: id
+    in: path
+    type: string
+    description: type's id of the sensor type
+    required: true
+  - in: body
+    name: body
+    required: true
+    description: Description of the sensor type
+    schema:
+      properties:
+        name:
+          type: string
+          example: 'Temperatura'
+        description:
+          type: string
+          example: 'Valor médio da Temperatura ao redor do Sensor'
+responses:
+  '200':
+    description: Returns the new Type's id changed
+    schema:
+      properties:
+        id:
+          type: uuid
+          example: 'f62a5b99-17cc-4df0-969e-0a55ba3cf344'
+  '400':
+    description: Error as a malformed request 
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: One of the detail fields has more than 50 characters
+  '401':
+    description: Returns an error, as this endpoint is not available
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404': 
+    description: The Type's name does not exist 
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The name type sent does not exist

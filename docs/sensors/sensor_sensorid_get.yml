@@ -1,0 +1,51 @@
+Get metadata on a given sensor
+---
+tags:
+- Sensors
+definitions:
+  sensor_metadata:
+    properties:
+      description:
+        type: string
+        example: 'Proveniente de um Sensor TSL2561, taxa de amostragem de 3 segundos'
+      data:
+        properties:
+          type:
+            type: string
+            example: 'Luminosidade'
+          unit_symbol:
+            type: string
+            example: 'Lux'
+      room_id:
+        $ref: "#/definitions/uuid"
+parameters:
+  - name: sensorid
+    in: path
+    type: string
+    description: uuid of the desired sensor
+    required: true
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- application/json
+responses:
+  '200':
+    description: Returns all metadata information on the given sensor
+    schema:
+      $ref: "#/definitions/sensor_metadata"
+  '401':
+    description: Returns an error, as the sensor is not available to the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to sensor
+  '404':
+    description: Returns an error, sensor id sent in the form does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The sensorid does not exist

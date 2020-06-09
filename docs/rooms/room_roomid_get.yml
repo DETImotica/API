@@ -1,0 +1,46 @@
+Get metadata on a given room
+---
+tags:
+    - Rooms
+definitions:
+  room_metadata:
+    properties:
+      name:
+        type: string
+        description: Room's name
+        example: '4.1.23'
+      description:
+        type: string
+        description: Room's description
+        example: 'DETI MakerLab'
+consumes:
+    - application/x-www-form-urlencoded
+produces:
+    - application/json
+parameters:
+  - name: roomid
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+responses:
+  '200':
+    description: Returns relevant information on the desired room
+    schema:
+        $ref: "#/definitions/room_metadata"
+  '401':
+    description: Returns an error, as the room is not available for the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to a Room
+  '404':
+    description: Returns an error, as the room id does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The roomid does not exist

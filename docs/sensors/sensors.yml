@@ -1,0 +1,15 @@
+Get the sensors_id for a user from the database
+---
+tags:
+- Sensors
+produces:
+- application/json
+responses:
+  '200':
+    description: Returns all sensors currently registered on the system that are available for the user
+    schema:
+      properties:
+        sensors:
+          type: array
+          items:
+            $ref: '#/definitions/uuid'

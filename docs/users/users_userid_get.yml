@@ -1,0 +1,39 @@
+Get User with the id userid of the database
+---
+tags:
+- Users
+produces:
+- application/json
+parameters:
+  - name: userid
+    in: path
+    type: string
+    description: uuid of the desired room
+    required: true
+responses:
+  '200':
+    description: Returns User's information
+    schema:
+      properties:
+        email:
+          type: string
+          example: example@ua.pt
+        admin:
+          type: string
+          example: "false"
+  '401':
+    description: Returns an error as only admins can get all the users ids
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied, admin only endpoint
+  '404':
+    description: Returns an error, as the user id does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The userid does not exist

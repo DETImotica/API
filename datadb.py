@@ -43,7 +43,7 @@ class DataDB(object):
     # Get a set of metrics from a sensor
     def query_interval(self, id, int1, int2):
         if not int1 or not int2:
-            return json.dumps({})
+            return json.dumps({"values": []})
 
         influx_conn = self._open()
 
@@ -58,33 +58,20 @@ class DataDB(object):
         influx_conn.close()
         return json.dumps({'values' : result})
 
-    # Query the average of a set of values
-    def query_avg(self, id, int1, int2):
+    # Query the average of a set of values in a given time interval
+    # Supports grouped query by timeframe and limit of datapoints
+    def query_avg(self, id, int1, int2, group_interval=None, limit=None):
         if not int1 or not int2:
-            return json.dumps({})
+            return json.dumps({"values": []})
         
         influx_conn = self._open()
 
-        res = influx_conn.query(f"SELECT MEAN(\"value\") AS \"value\" FROM value WHERE (time >= '{int1}' AND time <= '{int2}') AND \"device\" = '{id}'")
-        
+        res = influx_conn.query(f"SELECT MEAN(\"value\") AS \"value\" FROM value WHERE (time >= '{int1}' AND time <= '{int2}') AND \"device\" = '{id}' " 
+                                + (f"GROUP BY time({group_interval}),* " if group_interval else "")
+                                + (f"LIMIT {limit}" if limit else "")
+                               )
+        result = []
         for p in res.get_points():
-            influx_conn.close()
-            return json.dumps(dict({'values': [{"time": p['time'], "value": p['value']}]}))
+            result.append({"time": p['time'], "value": p['value']})    
         influx_conn.close()
-        return json.dumps({})
-
-    # Query users in the database
-    def query_users(self):
-        influx_conn = self._open()
-        influx_conn.close()
-        return None
-
-    def add_user(self, id, email):
-        influx_conn = self._open()
-        influx_conn.close()
-        return True
-
-    def has_user(self, id):
-        influx_conn = self._open()
-        influx_conn.close()
-        return False
+        return json.dumps({"values": result})

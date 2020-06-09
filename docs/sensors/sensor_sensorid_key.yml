@@ -1,0 +1,35 @@
+Get the key generated for the sensor with the sensorid
+---
+tags:
+- Sensors
+parameters:
+  - name: sensorid
+    in: path
+    type: string
+    description: uuid of the desired sensor
+    required: true
+produces:
+- application/json
+responses:
+  '200':
+    description: Returns the key generated for the sensor
+    schema:
+      properties:
+        key:
+          type: string
+  '401':
+    description: Returns an error, as the sensor is not available to the user
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: Access denied to sensor
+  '404':
+    description: Returns an error, sensor id sent in the form does not exist
+    schema:
+      error_description: error_details_message
+      properties:
+        error_description:
+          type: string
+          example: The sensorid does not exist

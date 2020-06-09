@@ -4,7 +4,8 @@ import logging
 from werkzeug.exceptions import NotFound
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
-from api import app, csrf, paranoid, APP_BASE_ENDPOINT, VERSION
+from api import app, csrf, APP_BASE_ENDPOINT, VERSION
+from caching import cache, session_cache
 
 def app_not_found(env, resp):
     return NotFound()(env, resp)
@@ -17,7 +18,9 @@ app.config['SECRET_KEY'] = config['info']['app_key']
 app.config['APPLICATION_ROOT'] = f"/{APP_BASE_ENDPOINT}/{VERSION}"
 
 csrf.init_app(app)
-paranoid.init_app(app)
+#paranoid.init_app(app)
+cache.init_app(app)
+session_cache.init_app(app)
 
 app.wsgi_app = DispatcherMiddleware(app_not_found, {f"/{APP_BASE_ENDPOINT}/{VERSION}": app.wsgi_app})
 

@@ -1,0 +1,23 @@
+Logout endpoint
+---
+tags:
+- Session
+consumes:
+- application/x-www-form-urlencoded
+produces:
+- text/html
+responses:
+  '400':
+    description: Means that you are not logged in, to call this endpoint
+    examples:
+      text/html: Logout bad request Server returned <b>You are not logged in<b>
+  '401':
+    description: Means that you are not longer logged in, so you cannot log out
+    examples:
+      text/html: Session expired. Please login.
+  '200':
+    description: Means that you logged out sucessfully
+    examples:
+      text/html: Logout successful
+        
+

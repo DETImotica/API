@@ -1,0 +1,22 @@
+Get a list of all existing rooms for a user, where each one has at least one sensor available
+---
+tags:
+- Rooms
+definitions:
+  uuid:
+      type: string
+      description: universally unique identifier (uuid)
+      example: '38a4b915-bbb2-4e1f-9d48-ad69325f09e8'
+produces:
+- application/json
+responses:
+  '200':
+    description: Returns a list of the IDs of all existing rooms
+    schema:
+      id: ids_list
+      properties:
+        ids:
+          type: array
+          items:
+            $ref: "#/definitions/uuid"
+
