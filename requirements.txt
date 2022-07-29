@@ -19,7 +19,7 @@ Jinja2==2.11.2
 jsonpickle==1.4
 jsonschema==3.2.0
 MarkupSafe==1.1.1
-mistune==0.8.4
+mistune==2.0.3
 oauthlib==3.1.0
 psycopg2==2.8.5
 psycopg2-binary==2.8.4
